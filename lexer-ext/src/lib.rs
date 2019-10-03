@@ -155,6 +155,7 @@ pub mod error {
         BlockStartError,
         StrStartError,
         StrEndError,
+        UnkownSymbol,
         InvalidToken,
 
         InvalidChar(char),

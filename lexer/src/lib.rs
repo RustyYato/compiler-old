@@ -207,42 +207,38 @@ pub fn is_keyword(lexeme: &str) -> bool {
 
 #[inline]
 pub fn parse_symbol<'input>(input: &'input str, white_space: Option<&'input str>) -> Result<&'input str, Token<'input>> {
-    let len: usize = input
-        .chars()
-        .take_while(|&c| is_symbol_char(c))
-        .map(|c| c.len_utf8())
-        .sum();
-
-    if len == 0 {
-        Err(Error {
-            input,
-            meta: Meta::Symbol,
-            ty: error::Type::EmptyInput,
-        })
-    } else {
-        let (lexeme, input) = input.split_at(len);
-
-        Ok((
-            input,
-            Token {
-                white_space,
-                ty: Type::Symbol,
-                lexeme,
-            },
-        ))
+    macro_rules! ret_op {
+        ($lexeme:expr, $input:expr) => { return Ok(($input, Token { white_space, lexeme: $lexeme, ty: lexer_ext::token::Type::Symbol })) }
     }
-}
 
-pub fn is_symbol_char(c: char) -> bool {
-    match c {
-        '!' | '@' | '#' | '$' | '%' | '^' | '&' | '*' | '|' | '<' | '>' | '=' | '-' | '+' | '/'
-        | '\\' | '~' | '`' | '?' | ',' | '.' | '\'' | ':' => true,
-        _ => false,
+    if input.get(0..2).is_some() {
+        let (lexeme, input) = input.split_at(2);
+
+        match lexeme {
+            | ".-"
+            | "==" | "!="
+            | "<=" | ">="
+                => ret_op!(lexeme, input),
+            _ => ()
+        }
     }
-}
+    
+    if input.get(0..1).is_some() {
+        let (lexeme, input) = input.split_at(1);
 
-pub fn is_symbol(input: &str) -> bool {
-    input.chars().all(is_symbol_char)
+        match lexeme {
+            | "+" | "-" | "*" | "/"
+            | "!" | "?" | "." | "$"
+                => ret_op!(lexeme, input),
+            _ => ()
+        }
+    }
+    
+    Err(Error {
+        input,
+        meta: Meta::Symbol,
+        ty: error::Type::UnkownSymbol,
+    })
 }
 
 #[inline]
