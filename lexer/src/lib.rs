@@ -215,7 +215,7 @@ pub fn parse_symbol<'input>(input: &'input str, white_space: Option<&'input str>
         let (lexeme, input) = input.split_at(2);
 
         match lexeme {
-            | ".-"
+            | ".*" | "::"
             | "==" | "!="
             | "<=" | ">="
                 => ret_op!(lexeme, input),
