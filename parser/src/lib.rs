@@ -1,8 +1,8 @@
-use lexer_ext::token::{self, Lexer, Token as RawToken};
+use lexer_ext::token::{self, Lexer, Token};
 use lln_peek::LLNPeek;
 
 use parser_ext::{
-    ast::{item::*, Ast, Token, Elaborate},
+    ast::{item::*, Ast},
     error::{self, Error, Result},
 };
 
@@ -16,22 +16,17 @@ macro_rules! ws {
 }
 
 type Alloc<'alloc, 'input> = &'alloc Arena<Ast<'alloc, 'input>>;
-type Iter<'input, L> = LLNPeek<Elaborate<token::Iter<'input, L>>>;
+type Iter<'input, L> = LLNPeek<'input, L>;
 
 #[derive(Debug, Clone)]
 pub struct ParserImpl<'input, L: Lexer<'input>> {
-    pub lexer: Iter<'input, L>,
+    lexer: Iter<'input, L>,
 }
 
 impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     pub fn new(lexer: L) -> Self {
         Self {
-            lexer: LLNPeek::new(Elaborate {
-                iter: token::Iter {
-                    lexer,
-                    mark: std::marker::PhantomData,
-                },
-            }),
+            lexer: LLNPeek::new(lexer),
         }
     }
 
@@ -39,35 +34,64 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         &mut self,
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
-        self.parse_expr_base(alloc)
-    }
+        let mut ast: Option<Ast<'alloc, 'input>> = None;
 
-    fn parse_expr_base<'alloc>(
-        &mut self,
-        alloc: Alloc<'alloc, 'input>,
-    ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
-        let token = self.lexer.next().ok_or(Error::EmptyInput)?;
-        
-        match token.value.ty {
-            token::Type::BlockStart(token::Block::Paren) => {
-                let open = token;
-                let expr = self.parse_expr(alloc)?;
-                let expr = alloc.insert(expr);
-
-                let close = self.lexer.next().unwrap();
-
-                if let token::Type::BlockEnd(token::Block::Paren) = close.value.ty {
-                    Ok(Ast::Block {
-                        open,
-                        close,
-                        inner: expr
-                    })
-                } else {
-                    Err(Error::EndOfBlockNotFound(token::Block::Paren, close))
+        macro_rules! return_or {
+            ($($or:tt)*) => {
+                match ast {
+                    Some(ast) => return Ok(ast),
+                    None => {
+                        $($or)*
+                    }
                 }
             }
-            token::Type::Ident => Ok(Ast::Ident(token)),
-            x => unimplemented!("{:?}", x),
+        }
+
+        loop {
+            let token = match self.lexer.peek_iter(1).next() {
+                Some(&mut Ok(token)) => token,
+                Some(&mut Err(_)) => return_or!(self.lexer.parse_token()?),
+                None => return_or!(return Err(Error::EmptyInput))
+            };
+        
+            match token.ty {
+                token::Type::BlockStart(token::Block::Paren) => {
+                    let _ = self.lexer.parse_token();
+                    let open = token;
+
+                    let expr = self.parse_expr(alloc)?;
+                    let expr = alloc.insert(expr);
+
+                    let close = self.lexer.parse_token()?;
+
+                    if let token::Type::BlockEnd(token::Block::Paren) = close.ty {
+                        ast = Some(Ast::Block {
+                            open,
+                            close,
+                            inner: expr
+                        });
+                    } else {
+                        return Err(Error::EndOfBlockNotFound(token::Block::Paren, close))
+                    }
+                }
+                token::Type::Ident => {
+                    let _ = self.lexer.parse_token();
+                    ast = Some(Ast::Ident(token))
+                }
+                token::Type::Symbol => {
+                    match token.lexeme {
+                        ".-" => {
+                            ast = Some(Ast::PostOp {
+                                expr: alloc.insert(ast.ok_or(Error::NoExpression)?),
+                                op: token
+                            });
+                        },
+                        _ => return_or!(unimplemented!("symbol {:?}", token.lexeme))
+                    }
+                    let _ = self.lexer.parse_token();
+                }
+                x => return_or!(unimplemented!("unknown {:?}", x))
+            }
         }
     }
 }

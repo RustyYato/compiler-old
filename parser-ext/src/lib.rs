@@ -1,45 +1,9 @@
 pub mod ast {
-    use lexer_ext::token::{self, Token as RawToken};
+    use lexer_ext::token::{self, Token};
     
     pub type AstPtr<'alloc, 'input> = &'alloc Ast<'alloc, 'input>;
 
-    #[derive(Debug, Clone, Copy, PartialEq)]
-    pub struct Token<'input> {
-        pub whitespace: Option<&'input str>,
-        pub value: RawToken<'input>,
-        private: ()
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct Elaborate<I> {
-        pub iter: I,
-    }
-
-    impl<'input, Iter: Iterator<Item = RawToken<'input>>> Iterator for Elaborate<Iter> {
-        type Item = Token<'input>;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            let token = self.iter.next()?;
-
-            if let token::Type::WhiteSpace = token.ty {
-                if let Some(next) = self.iter.next() {
-                    return Some(Token {
-                        whitespace: Some(token.lexeme),
-                        value: next,
-                        private: ()
-                    })
-                }
-            }
-
-            Some(Token {
-                whitespace: None,
-                value: token,
-                private: ()
-            })
-        }
-    }
-
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Copy)]
     pub enum Ast<'alloc, 'input> {
         // Literal(item::Literal<'input>),
         Ident(Token<'input>),
@@ -47,16 +11,14 @@ pub mod ast {
             open: Token<'input>,
             inner: AstPtr<'alloc, 'input>,
             close: Token<'input>,
+        },
+        PostOp {
+            expr: AstPtr<'alloc, 'input>,
+            op: Token<'input>,
         }
     }
 
     use std::fmt;
-    impl fmt::Display for Token<'_> {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, "{}", self.value)
-        }
-    }
-
     impl fmt::Display for Ast<'_, '_> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self {
@@ -64,6 +26,9 @@ pub mod ast {
                 Self::Block {
                     open, inner, close
                 } => write!(f, "{}{}{}", open, inner, close),
+                Self::PostOp {
+                    expr, op
+                } => write!(f, "{}{}", expr, op),
             }
         }
     }
@@ -94,6 +59,8 @@ pub mod ast {
 }
 
 pub mod error {
+    use lexer_ext::token::{Token, Block};
+
     pub type Result<'input, T, E> = std::result::Result<T, Error<'input, E>>;
 
     impl<I> From<lexer_ext::error::Error<I>> for Error<'_, I> {
@@ -105,7 +72,8 @@ pub mod error {
     #[derive(Debug, PartialEq)]
     pub enum Error<'input, I> {
         EmptyInput,
-        EndOfBlockNotFound(lexer_ext::token::Block, crate::ast::Token<'input>),
+        NoExpression,
+        EndOfBlockNotFound(Block, Token<'input>),
         ExpectedSymbol(&'static [&'static str]),
         Lex(lexer_ext::error::Error<I>)
     }
