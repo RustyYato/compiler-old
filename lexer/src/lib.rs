@@ -2,7 +2,7 @@
 
 use lexer_ext::{
     error::{self, Meta, Error},
-    token::{self, Block, Iter, Type, Token, TokenRes},
+    token::{Block, Iter, Type, Token, TokenRes},
 };
 
 pub type Result<I, T> = std::result::Result<(I, T), Error<I>>;
@@ -21,22 +21,6 @@ fn match_char(c: char) -> impl FnMut(&str) -> Result<&str, &str> {
             meta: Meta::Other("match_char"),
             ty: error::Type::InvalidChar(c),
         }),
-    }
-}
-
-#[inline]
-fn match_str(s: &'static str) -> impl FnMut(&str) -> Result<&str, &str> {
-    move |input| {
-        if input.starts_with(s) {
-            let (s, input) = input.split_at(s.len());
-            Ok((input, s))
-        } else {
-            Err(Error {
-                input,
-                meta: Meta::Other("match_str"),
-                ty: error::Type::InvalidStr(s),
-            })
-        }
     }
 }
 
@@ -261,72 +245,6 @@ pub fn is_symbol(input: &str) -> bool {
     input.chars().all(is_symbol_char)
 }
 
-// #[inline]
-// pub fn parse_block(input: &str) -> Result<&str, Token<'_>> {
-//     #[inline]
-//     pub fn parse_block_inner(input: &str) -> Result<&str, Iter<'_, LexerImpl>> {
-//         let iter = iter(input);
-
-//         let input = {
-//             let mut iter = iter.clone();
-//             iter.for_each(drop);
-//             iter.lexer.input
-//         };
-
-//         Ok((input, iter))
-//     }
-
-//     if input.is_empty() {
-//         return Err(Error {
-//             input,
-//             meta: Meta::Block,
-//             ty: error::Type::EmptyInput,
-//         });
-//     }
-
-//     let first = input.get(0..1);
-//     let ty = match first {
-//         Some("(") => Block::Paren,
-//         Some("[") => Block::Square,
-//         Some("{") => Block::Curly,
-//         _ => {
-//             return Err(Error {
-//                 input,
-//                 meta: Meta::Block,
-//                 ty: error::Type::BlockStartError,
-//             })
-//         }
-//     };
-
-//     let next_input = &input[1..];
-//     let (next_input, block) = parse_block_inner(next_input).expect("Infallible");
-
-//     let first = input.get(0..1);
-
-//     match (ty, first) {
-//         (Block::Paren, Some("(")) | (Block::Square, Some("[")) | (Block::Curly, Some("{")) => (),
-//         _ => {
-//             return Err(Error {
-//                 input,
-//                 meta: Meta::Block,
-//                 ty: error::Type::BlockEndError(ty),
-//             })
-//         }
-//     }
-
-//     let next_input = &next_input[1..];
-
-//     let len = input.len() - next_input.len();
-
-//     Ok((
-//         next_input,
-//         Token {
-//             lexeme: &input[..len],
-//             ty: Type::Block(ty, lexer_ext::token::BlockInner::Lazy(block)),
-//         },
-//     ))
-// }
-
 #[inline]
 pub fn parse_str(input: &str) -> Result<&str, Token<'_>> {
     if input.is_empty() {
@@ -400,19 +318,11 @@ impl<'input> LexerImpl<'input> {
     }
 }
 
-macro_rules! try_parse {
-    ($self:ident, $func:expr) => {{
-        let (input, token) = $func($self.input)?;
-        $self.input = input;
-        Ok(token)
-    }}
-}
-
-impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
-    type Input = &'input str;
+impl<'input> LexerImpl<'input> {
+    
 
     #[inline]
-    fn parse_block(&mut self) -> TokenRes<'input, Self::Input> {
+    fn parse_block(&mut self) -> TokenRes<'input, &'input str> {
         let input = self.input;
 
         if input.is_empty() {
@@ -424,67 +334,85 @@ impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
         }
 
         let first = input.get(0..1);
+
         match first {
-            Some(lexeme@"(") => {
+            Some("(") => {
+                let (lexeme, input) = self.input.split_at(1);
+                self.input = input;
                 self.blocks.push(Block::Paren);
 
-                Token {
+                Ok(Token {
                     lexeme,
                     ty: Type::BlockStart(Block::Paren)
-                }
+                })
             },
-            Some(lexeme@"[") => {
+            Some("[") => {
+                let (lexeme, input) = self.input.split_at(1);
+                self.input = input;
                 self.blocks.push(Block::Square);
 
-                Token {
+                Ok(Token {
                     lexeme,
                     ty: Type::BlockStart(Block::Square)
-                }
+                })
             },
-            Some(lexeme@"{") => {
+            Some("{") => {
+                let (lexeme, input) = self.input.split_at(1);
+                self.input = input;
                 self.blocks.push(Block::Curly);
 
-                Token {
+                Ok(Token {
                     lexeme,
                     ty: Type::BlockStart(Block::Curly)
-                }
+                })
             },
-            Some(lexeme@")") => {
+            Some(")") => {
+                let (lexeme, input) = self.input.split_at(1);
+                
                 if let Some(Block::Paren) = self.blocks.pop() {
-                    Token {
+                    self.input = input;
+
+                    Ok(Token {
                         lexeme,
                         ty: Type::BlockEnd(Block::Paren)
-                    }
+                    })
                 } else {
-                    return Err(Error {
+                    Err(Error {
                         input: self.input,
                         meta: Meta::Block,
                         ty: error::Type::BlockEndError(Block::Paren)
                     })
                 }
             },
-            Some(lexeme@"]") => {
+            Some("]") => {
+                let (lexeme, input) = self.input.split_at(1);
+                
                 if let Some(Block::Square) = self.blocks.pop() {
-                    Token {
+                    self.input = input;
+                    Ok(Token {
                         lexeme,
                         ty: Type::BlockEnd(Block::Square)
-                    }
+                    })
                 } else {
-                    return Err(Error {
+                    Err(Error {
                         input: self.input,
                         meta: Meta::Block,
                         ty: error::Type::BlockEndError(Block::Square)
                     })
                 }
             },
-            Some(lexeme@"}") => {
+            Some("}") => {
+                let (lexeme, input) = self.input.split_at(1);
+                
                 if let Some(Block::Curly) = self.blocks.pop() {
-                    Token {
+                    self.input = input;
+                    
+                    Ok(Token {
                         lexeme,
                         ty: Type::BlockEnd(Block::Curly)
-                    }
+                    })
                 } else {
-                    return Err(Error {
+                    Err(Error {
                         input: self.input,
                         meta: Meta::Block,
                         ty: error::Type::BlockEndError(Block::Curly)
@@ -492,99 +420,21 @@ impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
                 }
             },
             _ => {
-                return Err(Error {
+                Err(Error {
                     input,
                     meta: Meta::Block,
                     ty: error::Type::BlockStartError,
                 })
             }
-        };
-
-
-
-        // let next_input = &input[1..];
-        // let (next_input, block) = parse_block_inner(next_input).expect("Infallible");
-
-        // let first = next_input.get(0..1);
-
-        // match (ty, first) {
-        //     (Block::Paren, Some(")")) | (Block::Square, Some("]")) | (Block::Curly, Some("}")) => (),
-        //     _ => {
-        //         return Err(Error {
-        //             input,
-        //             meta: Meta::Block,
-        //             ty: error::Type::BlockEndError(ty),
-        //         })
-        //     }
-        // }
-
-        // let next_input = &next_input[1..];
-
-        // let len = input.len() - next_input.len();
-
-        // Ok((
-        //     next_input,
-        //     Token {
-        //         lexeme: &input[..len],
-        //         ty: Type::Block(ty, lexer_ext::token::BlockInner::Eager(block)),
-        //     },
-        // ))
-        unimplemented!()
-    }
-
-    #[inline]
-    fn parse_num(&mut self) -> TokenRes<'input, Self::Input> {
-        try_parse!(self, parse_num)
-    }
-
-    #[inline]
-    fn parse_str(&mut self) -> TokenRes<'input, Self::Input> {
-        try_parse!(self, parse_str)
-    }
-
-    #[inline]
-    fn parse_ident(&mut self) -> TokenRes<'input, Self::Input> {
-        let (input, token) = parse_ident(self.input)?;
-        if let token::Type::Ident = token.ty {
-            self.input = input;
-            Ok(token)
-        } else {
-            Err(error::Error {
-                input: self.input,
-                meta: Meta::Ident,
-                ty: error::Type::InvalidIdentifier,
-            })
         }
     }
+}
+
+impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
+    type Input = &'input str;
 
     #[inline]
-    fn parse_keyword(&mut self, keyword: &'static str) -> TokenRes<'input, Self::Input> {
-        assert!(is_keyword(keyword));
-        let (input, lexeme) = match_str(keyword)(self.input)?;
-        self.input = input;
-        Ok(Token { lexeme, ty: Type::Keyword })
-    }
-
-    #[inline]
-    fn parse_semicolon(&mut self) -> TokenRes<'input, Self::Input> {
-        try_parse!(self, parse_semicolon)
-    }
-
-    #[inline]
-    fn parse_symbol(&mut self, symbol: &'static str) -> TokenRes<'input, Self::Input> {
-        assert!(is_symbol(symbol));
-        let (input, lexeme) = match_str(symbol)(self.input)?;
-        self.input = input;
-        Ok(Token { lexeme, ty: Type::Symbol })
-    }
-
-    #[inline]
-    fn parse_white_space(&mut self) -> TokenRes<'input, Self::Input> {
-        try_parse!(self, parse_white_space)
-    }
-
-    #[inline]
-    fn parse_token(&mut self) -> TokenRes<'input, Self::Input> {
+    fn parse_token(&mut self) -> TokenRes<'input, &'input str> {
         macro_rules! forward {
             ($res:expr) => {
                 if let Ok((input, token)) = $res {

@@ -19,6 +19,31 @@ pub mod token {
         BlockEnd(Block),
     }
 
+    impl fmt::Display for Token<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self.ty {
+                Type::Ident => write!(f, "{}", self.lexeme),
+                Type::Symbol => write!(f, "{}", self.lexeme),
+                Type::Keyword => write!(f, "{}", self.lexeme),
+                Type::WhiteSpace => if self.lexeme.contains('\n') {
+                    writeln!(f)
+                } else {
+                    write!(f, " ")
+                },
+                Type::SemiColon => write!(f, ";"),
+                Type::Int(_) => write!(f, "{}", self.lexeme),
+                Type::Float(_) => write!(f, "{}", self.lexeme),
+                Type::Str(_) => write!(f, "{:?}", self.lexeme),
+                Type::BlockStart(Block::Paren) => write!(f, "("),
+                Type::BlockStart(Block::Square) => write!(f, "["),
+                Type::BlockStart(Block::Curly) => write!(f, "{{"),
+                Type::BlockEnd(Block::Paren) => write!(f, ")"),
+                Type::BlockEnd(Block::Square) => write!(f, "]"),
+                Type::BlockEnd(Block::Curly) => write!(f, "}}"),
+            }
+        }
+    }
+
     #[repr(u8)]
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum Block {
@@ -79,22 +104,6 @@ pub mod token {
 
     pub trait Lexer<'input> {
         type Input: 'input + std::fmt::Debug;
-
-        fn parse_block(&mut self) -> TokenRes<'input, Self::Input>;
-
-        fn parse_num(&mut self) -> TokenRes<'input, Self::Input>;
-        
-        fn parse_str(&mut self) -> TokenRes<'input, Self::Input>;
-        
-        fn parse_ident(&mut self) -> TokenRes<'input, Self::Input>;
-        
-        fn parse_keyword(&mut self, keyword: &'static str) -> TokenRes<'input, Self::Input>;
-        
-        fn parse_semicolon(&mut self) -> TokenRes<'input, Self::Input>;
-        
-        fn parse_symbol(&mut self, symbol: &'static str) -> TokenRes<'input, Self::Input>;
-
-        fn parse_white_space(&mut self) -> TokenRes<'input, Self::Input>;
 
         fn parse_token(&mut self) -> TokenRes<'input, Self::Input>;
     }
