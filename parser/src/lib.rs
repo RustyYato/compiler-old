@@ -1,4 +1,7 @@
-use lexer_ext::token::{self, Lexer, Token};
+use lexer_ext::{
+    token::{self, Lexer, Token},
+    error::TokenRes
+};
 use lln_peek::LLNPeek;
 
 use parser_ext::{
@@ -16,7 +19,7 @@ macro_rules! ws {
 }
 
 type Alloc<'alloc, 'input> = &'alloc Arena<Ast<'alloc, 'input>>;
-type Iter<'input, L> = LLNPeek<'input, L>;
+type Iter<'input, L> = LLNPeek<L, TokenRes<'input, L>>;
 
 #[derive(Debug, Clone)]
 pub struct ParserImpl<'input, L: Lexer<'input>> {
@@ -48,13 +51,19 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         }
 
         loop {
-            let token = match self.lexer.peek_iter(1).next() {
-                Some(&mut Ok(token)) => token,
-                Some(&mut Err(_)) => return_or!(self.lexer.parse_token()?),
+            self.lexer.reserve_tokens(1);
+            
+            let token = match self.lexer.peek() {
+                Some(&Ok(token)) => token,
+                Some(&Err(_)) => return_or!(self.lexer.parse_token()?),
                 None => return_or!(return Err(Error::EmptyInput))
             };
         
             match token.ty {
+                token::Type::Ident => {
+                    let _ = self.lexer.parse_token();
+                    ast = Some(Ast::Ident(token))
+                }
                 token::Type::BlockStart(token::Block::Paren) => {
                     let _ = self.lexer.parse_token();
                     let open = token;
@@ -74,13 +83,9 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
                         return Err(Error::EndOfBlockNotFound(token::Block::Paren, close))
                     }
                 }
-                token::Type::Ident => {
-                    let _ = self.lexer.parse_token();
-                    ast = Some(Ast::Ident(token))
-                }
                 token::Type::Symbol => {
                     match token.lexeme {
-                        ".-" => {
+                        ".*" => {
                             ast = Some(Ast::PostOp {
                                 expr: alloc.insert(ast.ok_or(Error::NoExpression)?),
                                 op: token

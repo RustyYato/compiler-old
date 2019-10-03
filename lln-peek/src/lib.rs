@@ -1,5 +1,5 @@
 
-use array_deque::{ArrayDeque, IterMut};
+use array_deque::{ArrayDeque, Iter};
 use lexer_ext::{
     token::{Lexer, Token},
     error::TokenRes
@@ -9,57 +9,74 @@ const N: usize = 10;
 type Buffer<T> = ArrayDeque<[T; N]>;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct LLNPeek<'input, L: Lexer<'input> + ?Sized> {
-    peek: Buffer<TokenRes<'input, L>>,
-    iter: L
+pub struct LLNPeek<Inner: ?Sized, T> {
+    peek: Buffer<T>,
+    inner: Inner
 }
 
-impl<'input, L: Lexer<'input>> LLNPeek<'input, L> {
-    pub fn new(iter: L) -> Self {
+impl<L, T> LLNPeek<L, T> {
+    pub fn new(inner: L) -> Self {
         Self {
             peek: Buffer::INIT,
-            iter
+            inner
         }
     }
 }
 
-impl<'input, L: Lexer<'input> + ?Sized> Lexer<'input> for LLNPeek<'input, L> {
+impl<I: Iterator + ?Sized> Iterator for LLNPeek<I, I::Item> {
+    type Item = I::Item;
+
+    fn next(&mut self) -> Option<I::Item> {
+        let Self { peek, inner } = self;
+
+        peek.remove().or_else(move || inner.next())
+    }
+}
+
+impl<'input, L: Lexer<'input> + ?Sized> Lexer<'input> for LLNPeek<L, TokenRes<'input, L>> {
     type Input = L::Input;
 
     fn parse_token(&mut self) -> TokenRes<'input, Self> {
-        let Self { peek, iter } = self;
+        let Self { peek, inner } = self;
         match peek.remove() {
             Some(res) => res,
-            None => iter.parse_token()
+            None => inner.parse_token()
         }
     }
 }
 
-impl<'input, L: Lexer<'input> + ?Sized> LLNPeek<'input, L> {
-    pub fn peek_iter(&mut self, n: usize) -> IterMut<'_, TokenRes<'input, L>> {
-        let Self { peek, iter } = self;
+impl<'input, L: Lexer<'input> + ?Sized> LLNPeek<L, TokenRes<'input, L>> {
+    pub fn reserve_tokens(&mut self, n: usize) {
+        let Self { peek, inner } = self;
         
         if peek.len() < n {
             let n = N.min(n);
             let len = peek.len();
 
             for i in 0..(n - len) {
-                peek.insert(iter.parse_token());
+                peek.insert(inner.parse_token());
             }
         }
-
-        peek.iter_mut()
     }
-
+    
     pub fn peek_len(&self) -> usize {
         self.peek.len()
     }
+}
+impl<T, Inner: ?Sized> LLNPeek<Inner, T> {
+    pub fn peek_iter(&self) -> Iter<'_, T> {
+        self.peek.iter()
+    }
+    
+    pub fn peek(&self) -> Option<&T> {
+        self.peek.iter().next()
+    }
 
-    pub fn try_push(&mut self, value: TokenRes<'input, L>) -> Result<(), TokenRes<'input, L>> {
+    pub fn try_push(&mut self, value: T) -> Result<(), T> {
         self.peek.try_insert(value)
     }
 
-    pub fn push(&mut self, value: TokenRes<'input, L>) {
+    pub fn push(&mut self, value: T) {
         self.peek.insert(value)
     }
 }
