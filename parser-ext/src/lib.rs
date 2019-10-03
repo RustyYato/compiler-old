@@ -3,7 +3,7 @@ pub mod ast {
     
     pub type AstPtr<'alloc, 'input> = &'alloc Ast<'alloc, 'input>;
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct Token<'input> {
         pub whitespace: Option<&'input str>,
         pub value: RawToken<'input>,
@@ -41,13 +41,30 @@ pub mod ast {
 
     #[derive(Debug, Clone)]
     pub enum Ast<'alloc, 'input> {
-        // Let(item::Let<'alloc, 'input>),
-        Literal(item::Literal<'input>),
+        // Literal(item::Literal<'input>),
         Ident(Token<'input>),
         Block {
             open: Token<'input>,
             inner: AstPtr<'alloc, 'input>,
             close: Token<'input>,
+        }
+    }
+
+    use std::fmt;
+    impl fmt::Display for Token<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "{}", self.value)
+        }
+    }
+
+    impl fmt::Display for Ast<'_, '_> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self {
+                Self::Ident(token) => write!(f, "{}", token),
+                Self::Block {
+                    open, inner, close
+                } => write!(f, "{}{}{}", open, inner, close),
+            }
         }
     }
 
@@ -77,27 +94,19 @@ pub mod ast {
 }
 
 pub mod error {
-    pub type Result<T, E> = std::result::Result<T, Error<E>>;
+    pub type Result<'input, T, E> = std::result::Result<T, Error<'input, E>>;
 
-    #[derive(Debug, PartialEq)]
-    pub struct Error<I> {
-        pub input: Option<I>,
-        pub ty: Type,
-    }
-
-    impl<I> From<lexer_ext::error::Error<I>> for Error<I> {
+    impl<I> From<lexer_ext::error::Error<I>> for Error<'_, I> {
         fn from(err: lexer_ext::error::Error<I>) -> Self {
-            Self {
-                input: Some(err.input),
-                ty: Type::Lex(err.meta, err.ty),
-            }
+            Self::Lex(err)
         }
     }
 
     #[derive(Debug, PartialEq)]
-    pub enum Type {
+    pub enum Error<'input, I> {
         EmptyInput,
+        EndOfBlockNotFound(lexer_ext::token::Block, crate::ast::Token<'input>),
         ExpectedSymbol(&'static [&'static str]),
-        Lex(lexer_ext::error::Meta, lexer_ext::error::Type),
+        Lex(lexer_ext::error::Error<I>)
     }
 }

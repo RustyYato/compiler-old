@@ -38,40 +38,36 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     pub fn parse_expr<'alloc>(
         &mut self,
         alloc: Alloc<'alloc, 'input>,
-    ) -> Result<Ast<'alloc, 'input>, L::Input> {
+    ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         self.parse_expr_base(alloc)
     }
 
     fn parse_expr_base<'alloc>(
         &mut self,
         alloc: Alloc<'alloc, 'input>,
-    ) -> Result<Ast<'alloc, 'input>, L::Input> {
-        let token = self.lexer.peek_iter(1).next().copied().ok_or(Error {
-            input: None,
-            ty: error::Type::EmptyInput,
-        })?;
-
+    ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
+        let token = self.lexer.next().ok_or(Error::EmptyInput)?;
+        
         match token.value.ty {
-            token::Type::BlockStart(block) => {
-                self.lexer.next();
-
+            token::Type::BlockStart(token::Block::Paren) => {
                 let open = token;
                 let expr = self.parse_expr(alloc)?;
                 let expr = alloc.insert(expr);
 
                 let close = self.lexer.next().unwrap();
-                assert!(close.value.ty == token::Type::BlockEnd(block));
 
-                Ok(Ast::Block {
-                    open,
-                    close,
-                    inner: expr
-                })
+                if let token::Type::BlockEnd(token::Block::Paren) = close.value.ty {
+                    Ok(Ast::Block {
+                        open,
+                        close,
+                        inner: expr
+                    })
+                } else {
+                    Err(Error::EndOfBlockNotFound(token::Block::Paren, close))
+                }
             }
-            token::Type::Ident => {
-                Ok(Ast::Ident(token))
-            }
-            _ => unimplemented!(),
+            token::Type::Ident => Ok(Ast::Ident(token)),
+            x => unimplemented!("{:?}", x),
         }
     }
 }
