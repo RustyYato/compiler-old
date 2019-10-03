@@ -1,8 +1,8 @@
 #![deny(unsafe_code)]
 
 use lexer_ext::{
-    error::{self, Meta, Error},
-    token::{Block, Iter, Type, Token, TokenRes},
+    error::{self, Meta, Error, TokenRes},
+    token::{Block, Iter, Type, Token},
 };
 
 pub type Result<I, T> = std::result::Result<(I, T), Error<I>>;
@@ -25,7 +25,7 @@ fn match_char(c: char) -> impl FnMut(&str) -> Result<&str, &str> {
 }
 
 #[inline]
-pub fn parse_num(input: &str) -> Result<&str, Token<'_>> {
+pub fn parse_num<'input>(input: &'input str, white_space: Option<&'input str>) -> Result<&'input str, Token<'input>> {
     #[inline]
     pub fn parse_integer_stub(input: &str) -> Result<&str, &str> {
         let mut chars = input.chars();
@@ -110,6 +110,7 @@ pub fn parse_num(input: &str) -> Result<&str, Token<'_>> {
         Ok((
             next_input,
             Token {
+                white_space,
                 ty: Type::Float(num),
                 lexeme,
             },
@@ -120,6 +121,7 @@ pub fn parse_num(input: &str) -> Result<&str, Token<'_>> {
         Ok((
             next_input,
             Token {
+                white_space,
                 ty: Type::Int(num),
                 lexeme,
             },
@@ -128,7 +130,7 @@ pub fn parse_num(input: &str) -> Result<&str, Token<'_>> {
 }
 
 #[inline]
-pub fn parse_white_space(input: &str) -> Result<&str, Token<'_>> {
+pub fn parse_white_space(input: &str) -> Result<&str, &str> {
     let len: usize = input
         .chars()
         .take_while(|c| c.is_whitespace())
@@ -142,20 +144,17 @@ pub fn parse_white_space(input: &str) -> Result<&str, Token<'_>> {
             ty: error::Type::EmptyInput,
         })
     } else {
-        let (lexeme, input) = input.split_at(len);
+        let (white_space, input) = input.split_at(len);
 
         Ok((
             input,
-            Token {
-                ty: Type::WhiteSpace,
-                lexeme,
-            },
+            white_space
         ))
     }
 }
 
 #[inline]
-pub fn parse_ident(input: &str) -> Result<&str, Token<'_>> {
+pub fn parse_ident<'input>(input: &'input str, white_space: Option<&'input str>) -> Result<&'input str, Token<'input>> {
     #[inline]
     pub fn parse_ident_str(input: &str) -> Result<&str, &str> {
         let mut chars = input.chars();
@@ -195,7 +194,7 @@ pub fn parse_ident(input: &str) -> Result<&str, Token<'_>> {
         Type::Ident
     };
 
-    Ok((input, Token { ty, lexeme }))
+    Ok((input, Token { white_space, ty, lexeme }))
 }
 
 #[inline]
@@ -207,7 +206,7 @@ pub fn is_keyword(lexeme: &str) -> bool {
 }
 
 #[inline]
-pub fn parse_symbol(input: &str) -> Result<&str, Token<'_>> {
+pub fn parse_symbol<'input>(input: &'input str, white_space: Option<&'input str>) -> Result<&'input str, Token<'input>> {
     let len: usize = input
         .chars()
         .take_while(|&c| is_symbol_char(c))
@@ -226,6 +225,7 @@ pub fn parse_symbol(input: &str) -> Result<&str, Token<'_>> {
         Ok((
             input,
             Token {
+                white_space,
                 ty: Type::Symbol,
                 lexeme,
             },
@@ -246,7 +246,7 @@ pub fn is_symbol(input: &str) -> bool {
 }
 
 #[inline]
-pub fn parse_str(input: &str) -> Result<&str, Token<'_>> {
+pub fn parse_str<'input>(input: &'input str, white_space: Option<&'input str>) -> Result<&'input str, Token<'input>> {
     if input.is_empty() {
         return Err(Error {
             input,
@@ -276,6 +276,7 @@ pub fn parse_str(input: &str) -> Result<&str, Token<'_>> {
     Ok((
         next_input,
         Token {
+            white_space,
             lexeme: &input[..len + 2],
             ty: Type::Str(inner.as_bytes()),
         },
@@ -283,24 +284,17 @@ pub fn parse_str(input: &str) -> Result<&str, Token<'_>> {
 }
 
 #[inline]
-fn parse_semicolon(input: &str) -> Result<&str, Token<'_>> {
+fn parse_semicolon<'input>(input: &'input str, white_space: Option<&'input str>) -> Result<&'input str, Token<'input>> {
     let (input, lexeme) = match_char(';')(input)?;
 
     Ok((
         input,
         Token {
+            white_space,
             ty: Type::SemiColon,
             lexeme,
         },
     ))
-}
-
-#[inline]
-pub fn iter(input: &str) -> Iter<'_, LexerImpl> {
-    Iter {
-        lexer: LexerImpl::new(input),
-        mark: std::marker::PhantomData
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -319,10 +313,8 @@ impl<'input> LexerImpl<'input> {
 }
 
 impl<'input> LexerImpl<'input> {
-    
-
     #[inline]
-    fn parse_block(&mut self) -> TokenRes<'input, &'input str> {
+    fn parse_block(&mut self, white_space: Option<&'input str>) -> TokenRes<'input, Self> {
         let input = self.input;
 
         if input.is_empty() {
@@ -342,6 +334,7 @@ impl<'input> LexerImpl<'input> {
                 self.blocks.push(Block::Paren);
 
                 Ok(Token {
+                    white_space,
                     lexeme,
                     ty: Type::BlockStart(Block::Paren)
                 })
@@ -352,6 +345,7 @@ impl<'input> LexerImpl<'input> {
                 self.blocks.push(Block::Square);
 
                 Ok(Token {
+                    white_space,
                     lexeme,
                     ty: Type::BlockStart(Block::Square)
                 })
@@ -362,6 +356,7 @@ impl<'input> LexerImpl<'input> {
                 self.blocks.push(Block::Curly);
 
                 Ok(Token {
+                    white_space,
                     lexeme,
                     ty: Type::BlockStart(Block::Curly)
                 })
@@ -373,6 +368,7 @@ impl<'input> LexerImpl<'input> {
                     self.input = input;
 
                     Ok(Token {
+                        white_space,
                         lexeme,
                         ty: Type::BlockEnd(Block::Paren)
                     })
@@ -390,6 +386,7 @@ impl<'input> LexerImpl<'input> {
                 if let Some(Block::Square) = self.blocks.pop() {
                     self.input = input;
                     Ok(Token {
+                        white_space,
                         lexeme,
                         ty: Type::BlockEnd(Block::Square)
                     })
@@ -408,6 +405,7 @@ impl<'input> LexerImpl<'input> {
                     self.input = input;
                     
                     Ok(Token {
+                        white_space,
                         lexeme,
                         ty: Type::BlockEnd(Block::Curly)
                     })
@@ -434,7 +432,7 @@ impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
     type Input = &'input str;
 
     #[inline]
-    fn parse_token(&mut self) -> TokenRes<'input, &'input str> {
+    fn parse_token(&mut self) -> TokenRes<'input, Self> {
         macro_rules! forward {
             ($res:expr) => {
                 if let Ok((input, token)) = $res {
@@ -444,13 +442,20 @@ impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
             }
         }
 
-        forward!(parse_white_space(self.input));
-        forward!(parse_semicolon(self.input));
-        forward!(parse_ident(self.input));
-        forward!(parse_symbol(self.input));
-        forward!(parse_str(self.input));
+        let white_space = match parse_white_space(self.input) {
+            Ok((input, white_space)) => {
+                self.input = input;
+                Some(white_space)
+            },
+            Err(_) => None
+        };
 
-        self.parse_block().map_err(|_| Error {
+        forward!(parse_semicolon(self.input, white_space));
+        forward!(parse_ident(self.input, white_space));
+        forward!(parse_symbol(self.input, white_space));
+        forward!(parse_str(self.input, white_space));
+
+        self.parse_block(white_space).map_err(|_| Error {
             input: self.input,
             meta: Meta::Token,
             ty: error::Type::InvalidToken

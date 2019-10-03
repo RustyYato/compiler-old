@@ -1,6 +1,7 @@
 pub mod token {
     #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct Token<'input> {
+        pub white_space: Option<&'input str>,
         pub lexeme: &'input str,
         pub ty: Type<'input>,
     }
@@ -10,7 +11,6 @@ pub mod token {
         Ident,
         Symbol,
         Keyword,
-        WhiteSpace,
         SemiColon,
         Int(u128),
         Float(f64),
@@ -25,11 +25,6 @@ pub mod token {
                 Type::Ident => write!(f, "{}", self.lexeme),
                 Type::Symbol => write!(f, "{}", self.lexeme),
                 Type::Keyword => write!(f, "{}", self.lexeme),
-                Type::WhiteSpace => if self.lexeme.contains('\n') {
-                    writeln!(f)
-                } else {
-                    write!(f, " ")
-                },
                 Type::SemiColon => write!(f, ";"),
                 Type::Int(_) => write!(f, "{}", self.lexeme),
                 Type::Float(_) => write!(f, "{}", self.lexeme),
@@ -94,18 +89,23 @@ pub mod token {
 
     #[derive(Debug, Clone)]
     pub struct Iter<'input, L: ?Sized> {
-        pub mark: std::marker::PhantomData<fn() -> Token<'input>>,
-        pub lexer: L,
+        mark: std::marker::PhantomData<fn() -> Token<'input>>,
+        lexer: L,
     }
 
-    use crate::error;
-
-    pub type TokenRes<'input, E> = Result<Token<'input>, error::Error<E>>;
+    use crate::error::TokenRes;
 
     pub trait Lexer<'input> {
-        type Input: 'input + std::fmt::Debug;
+        type Input: 'input + std::fmt::Debug + Clone + PartialEq;
 
-        fn parse_token(&mut self) -> TokenRes<'input, Self::Input>;
+        fn parse_token(&mut self) -> TokenRes<'input, Self>;
+
+        fn iter(self) -> Iter<'input, Self> where Self: Sized {
+            Iter {
+                lexer: self,
+                mark: std::marker::PhantomData
+            }
+        }
     }
 
     use std::fmt;
@@ -121,15 +121,16 @@ pub mod token {
 
 pub mod error {
     pub type Result<'input, L, T> = std::result::Result<T, Error<<L as crate::token::Lexer<'input>>::Input>>;
+    pub type TokenRes<'input, L> = Result<'input, L, crate::token::Token<'input>>;
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, Clone, PartialEq)]
     pub struct Error<I> {
         pub input: I,
         pub meta: Meta,
         pub ty: Type,
     }
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub enum Meta {
         Block,
         Num,
@@ -143,7 +144,7 @@ pub mod error {
         Other(&'static str),
     }
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub enum Type {
         EmptyInput,
         InvalidIdentifier,
