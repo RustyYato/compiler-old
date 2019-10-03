@@ -1,27 +1,21 @@
 
 use array_deque::{ArrayDeque, IterMut};
+use lexer_ext::{
+    token::{Lexer, Token},
+    error::TokenRes
+};
 
 const N: usize = 10;
 type Buffer<T> = ArrayDeque<[T; N]>;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct LLNPeek<I: Iterator + ?Sized> {
-    peek: Buffer<I::Item>,
-    iter: I
+pub struct LLNPeek<'input, L: Lexer<'input> + ?Sized> {
+    peek: Buffer<TokenRes<'input, L>>,
+    iter: L
 }
 
-impl<I: Iterator> IteratorExt for I {}
-pub trait IteratorExt: Iterator + Sized {
-    fn lln_peek(self) -> LLNPeek<Self> {
-        LLNPeek {
-            peek: Buffer::INIT,
-            iter: self
-        }
-    }
-}
-
-impl<I: Iterator> LLNPeek<I> {
-    pub fn new(iter: I) -> LLNPeek<I> {
+impl<'input, L: Lexer<'input>> LLNPeek<'input, L> {
+    pub fn new(iter: L) -> Self {
         Self {
             peek: Buffer::INIT,
             iter
@@ -29,23 +23,29 @@ impl<I: Iterator> LLNPeek<I> {
     }
 }
 
-impl<I: Iterator + ?Sized> Iterator for LLNPeek<I> {
-    type Item = I::Item;
+impl<'input, L: Lexer<'input> + ?Sized> Lexer<'input> for LLNPeek<'input, L> {
+    type Input = L::Input;
 
-    fn next(&mut self) -> Option<Self::Item> {
+    fn parse_token(&mut self) -> TokenRes<'input, Self> {
         let Self { peek, iter } = self;
-        peek.remove().or_else(move || iter.next())
+        match peek.remove() {
+            Some(res) => res,
+            None => iter.parse_token()
+        }
     }
 }
 
-impl<I: Iterator + ?Sized> LLNPeek<I> {
-    pub fn peek_iter(&mut self, n: usize) -> IterMut<'_, I::Item> {
+impl<'input, L: Lexer<'input> + ?Sized> LLNPeek<'input, L> {
+    pub fn peek_iter(&mut self, n: usize) -> IterMut<'_, TokenRes<'input, L>> {
         let Self { peek, iter } = self;
         
         if peek.len() < n {
             let n = N.min(n);
             let len = peek.len();
-            iter.take(n - len).fold((), |(), next| peek.insert(next));
+
+            for i in 0..(n - len) {
+                peek.insert(iter.parse_token());
+            }
         }
 
         peek.iter_mut()
@@ -55,29 +55,29 @@ impl<I: Iterator + ?Sized> LLNPeek<I> {
         self.peek.len()
     }
 
-    pub fn try_push(&mut self, value: I::Item) -> Result<(), I::Item> {
+    pub fn try_push(&mut self, value: TokenRes<'input, L>) -> Result<(), TokenRes<'input, L>> {
         self.peek.try_insert(value)
     }
 
-    pub fn push(&mut self, value: I::Item) {
+    pub fn push(&mut self, value: TokenRes<'input, L>) {
         self.peek.insert(value)
     }
 }
 
-pub fn peek(iter: &mut LLNPeek<dyn Iterator<Item = u32>>, f: fn(&mut u32)) {
-    iter.peek_iter(4).for_each(f);
-}
+// pub fn peek(iter: &mut LLNPeek<dyn Iterator<Item = u32>>, f: fn(&mut u32)) {
+//     iter.peek_iter(4).for_each(f);
+// }
 
-#[test]
-fn peek_test() {
-    fn copy<T: Copy>(&mut t: &mut T) -> T { t }
-    let mut peek = [0, 1, 2, 3, 4, 5].iter().copied().lln_peek();
+// #[test]
+// fn peek_test() {
+//     fn copy<T: Copy>(&mut t: &mut T) -> T { t }
+//     let mut peek = [0, 1, 2, 3, 4, 5].iter().copied().lln_peek();
 
-    assert_eq!(peek.peek_iter(2).map(copy).collect::<Vec<_>>(), [0, 1]);
-    assert_eq!(peek.peek_iter(4).map(copy).collect::<Vec<_>>(), [0, 1, 2, 3]);
+//     assert_eq!(peek.peek_iter(2).map(copy).collect::<Vec<_>>(), [0, 1]);
+//     assert_eq!(peek.peek_iter(4).map(copy).collect::<Vec<_>>(), [0, 1, 2, 3]);
     
-    peek.by_ref().take(2).for_each(drop);
+//     peek.by_ref().take(2).for_each(drop);
     
-    assert_eq!(peek.peek_iter(2).map(copy).collect::<Vec<_>>(), [2, 3]);
-    assert_eq!(peek.peek_iter(4).map(copy).collect::<Vec<_>>(), [2, 3, 4, 5]);
-}
+//     assert_eq!(peek.peek_iter(2).map(copy).collect::<Vec<_>>(), [2, 3]);
+//     assert_eq!(peek.peek_iter(4).map(copy).collect::<Vec<_>>(), [2, 3, 4, 5]);
+// }

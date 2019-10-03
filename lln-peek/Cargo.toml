@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 array-deque = { path = '../array-deque' }
+lexer-ext = { path = '../lexer-ext' }
