@@ -2,7 +2,7 @@ pub mod token {
     #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct Token<'input> {
         pub white_space: Option<&'input str>,
-        pub lexeme: &'input str,
+        pub lexeme: &'input [u8],
         pub ty: Type<'input>,
     }
 
@@ -21,14 +21,15 @@ pub mod token {
 
     impl fmt::Display for Token<'_> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let lexeme = std::str::from_utf8(self.lexeme).unwrap();
             match self.ty {
-                Type::Ident => write!(f, "{}", self.lexeme),
-                Type::Symbol => write!(f, "{}", self.lexeme),
-                Type::Keyword => write!(f, "{}", self.lexeme),
+                Type::Ident => write!(f, "{}", lexeme),
+                Type::Symbol => write!(f, "{}", lexeme),
+                Type::Keyword => write!(f, "{}", lexeme),
                 Type::SemiColon => write!(f, ";"),
-                Type::Int(_) => write!(f, "{}", self.lexeme),
-                Type::Float(_) => write!(f, "{}", self.lexeme),
-                Type::Str(_) => write!(f, "{:?}", self.lexeme),
+                Type::Int(_) => write!(f, "{}", lexeme),
+                Type::Float(_) => write!(f, "{}", lexeme),
+                Type::Str(_) => write!(f, "{:?}", lexeme),
                 Type::BlockStart(Block::Paren) => write!(f, "("),
                 Type::BlockStart(Block::Square) => write!(f, "["),
                 Type::BlockStart(Block::Curly) => write!(f, "{{"),
@@ -96,15 +97,23 @@ pub mod token {
     use crate::error::TokenRes;
 
     pub trait Lexer<'input> {
-        type Input: 'input + std::fmt::Debug + Clone + PartialEq;
+        type Input: 'input + std::fmt::Debug + Clone;
 
-        fn parse_token(&mut self) -> TokenRes<'input, Self>;
+        fn parse_token(&mut self) -> std::result::Result<Token<'input>, crate::error::Error<Self::Input>>;
 
-        fn iter(self) -> Iter<'input, Self> where Self: Sized {
-            Iter {
-                lexer: self,
-                mark: std::marker::PhantomData
-            }
+        // fn iter(self) -> Iter<'input, Self> where Self: Sized {
+        //     Iter {
+        //         lexer: self,
+        //         mark: std::marker::PhantomData
+        //     }
+        // }
+    }
+
+    impl<'input, L: Lexer<'input> + ?Sized> Lexer<'input> for &mut L {
+        type Input = L::Input;
+
+        fn parse_token(&mut self) -> TokenRes<'input, Self> {
+            L::parse_token(self)
         }
     }
 
