@@ -77,13 +77,15 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         }
     }
 
+    #[inline]
     pub fn parse_expr<'alloc>(
         &mut self,
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
-        self.parse_shift(alloc)
+        self.parse_bit_or(alloc)
     }
 
+    #[inline]
     fn parse_base<'alloc>(&mut self) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         match self.lexer.parse_token()? {
             ident@Token { ty: token::Type::Ident, .. } => Ok(Ast::Ident(ident)),
@@ -92,6 +94,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         }
     }
 
+    #[inline]
     fn parse_dot<'alloc>(
         &mut self,
         alloc: Alloc<'alloc, 'input>,
@@ -116,6 +119,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         }
     }
 
+    #[inline]
     fn parse_shift<'alloc>(
         &mut self,
         alloc: Alloc<'alloc, 'input>,
@@ -132,6 +136,42 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
             }
             
             b"<<<" => {
+                expr = Ast::BinOp {
+                    right: alloc.insert(parse!()?),
+                    left: alloc.insert(expr),
+                    op: token
+                };
+            }
+        }
+    }
+
+    #[inline]
+    fn parse_bit_and<'alloc>(
+        &mut self,
+        alloc: Alloc<'alloc, 'input>,
+    ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
+        parse_right_assoc! {
+            (self, alloc, expr, token, parse = parse_shift)
+
+            b"&" => {
+                expr = Ast::BinOp {
+                    right: alloc.insert(parse!()?),
+                    left: alloc.insert(expr),
+                    op: token
+                };
+            }
+        }
+    }
+
+    #[inline]
+    fn parse_bit_or<'alloc>(
+        &mut self,
+        alloc: Alloc<'alloc, 'input>,
+    ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
+        parse_right_assoc! {
+            (self, alloc, expr, token, parse = parse_bit_and)
+
+            b"|" => {
                 expr = Ast::BinOp {
                     right: alloc.insert(parse!()?),
                     left: alloc.insert(expr),
