@@ -211,6 +211,17 @@ pub fn parse_symbol<'input>(input: &'input str, white_space: Option<&'input str>
         ($lexeme:expr, $input:expr) => { return Ok(($input, Token { white_space, lexeme: $lexeme, ty: lexer_ext::token::Type::Symbol })) }
     }
 
+    if input.get(0..3).is_some() {
+        let (lexeme, input) = input.split_at(3);
+        let lexeme = lexeme.as_bytes();
+
+        match lexeme {
+            | b">>>" | b"<<<"
+                => ret_op!(lexeme, input),
+            _ => ()
+        }
+    }
+    
     if input.get(0..2).is_some() {
         let (lexeme, input) = input.split_at(2);
         let lexeme = lexeme.as_bytes();

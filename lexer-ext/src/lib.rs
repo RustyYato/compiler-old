@@ -101,12 +101,12 @@ pub mod token {
 
         fn parse_token(&mut self) -> std::result::Result<Token<'input>, crate::error::Error<Self::Input>>;
 
-        // fn iter(self) -> Iter<'input, Self> where Self: Sized {
-        //     Iter {
-        //         lexer: self,
-        //         mark: std::marker::PhantomData
-        //     }
-        // }
+        fn iter(self) -> Iter<'input, Self> where Self: Sized {
+            Iter {
+                lexer: self,
+                mark: std::marker::PhantomData
+            }
+        }
     }
 
     impl<'input, L: Lexer<'input> + ?Sized> Lexer<'input> for &mut L {
