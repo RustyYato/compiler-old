@@ -25,6 +25,7 @@ impl<T> Slab<T> {
 
         if data.len() < data.capacity() {
             let len = data.len();
+            
             data.push(value);
 
             unsafe { TryInsert::Complete(data.get_unchecked_mut(len)) }

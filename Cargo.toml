@@ -6,6 +6,7 @@ members = [
     'arena',
     'array-deque',
     'lln-peek',
+    'intern',
 
     'lexer',
     'lexer-ext',

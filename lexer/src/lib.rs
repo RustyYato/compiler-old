@@ -112,7 +112,7 @@ pub fn parse_num<'input>(input: &'input str, white_space: Option<&'input str>) -
             Token {
                 white_space,
                 ty: Type::Float(num),
-                lexeme,
+                lexeme: lexeme.as_bytes(),
             },
         ))
     } else {
@@ -123,7 +123,7 @@ pub fn parse_num<'input>(input: &'input str, white_space: Option<&'input str>) -
             Token {
                 white_space,
                 ty: Type::Int(num),
-                lexeme,
+                lexeme: lexeme.as_bytes(),
             },
         ))
     }
@@ -194,7 +194,7 @@ pub fn parse_ident<'input>(input: &'input str, white_space: Option<&'input str>)
         Type::Ident
     };
 
-    Ok((input, Token { white_space, ty, lexeme }))
+    Ok((input, Token { white_space, ty, lexeme: lexeme.as_bytes() }))
 }
 
 #[inline]
@@ -213,11 +213,12 @@ pub fn parse_symbol<'input>(input: &'input str, white_space: Option<&'input str>
 
     if input.get(0..2).is_some() {
         let (lexeme, input) = input.split_at(2);
+        let lexeme = lexeme.as_bytes();
 
         match lexeme {
-            | ".*" | "::"
-            | "==" | "!="
-            | "<=" | ">="
+            | b".*" | b"::"
+            | b"==" | b"!="
+            | b"<=" | b">="
                 => ret_op!(lexeme, input),
             _ => ()
         }
@@ -225,10 +226,11 @@ pub fn parse_symbol<'input>(input: &'input str, white_space: Option<&'input str>
     
     if input.get(0..1).is_some() {
         let (lexeme, input) = input.split_at(1);
+        let lexeme = lexeme.as_bytes();
 
         match lexeme {
-            | "+" | "-" | "*" | "/"
-            | "!" | "?" | "." | "$"
+            | b"+" | b"-" | b"*" | b"/"
+            | b"!" | b"?" | b"." | b"$"
                 => ret_op!(lexeme, input),
             _ => ()
         }
@@ -273,7 +275,7 @@ pub fn parse_str<'input>(input: &'input str, white_space: Option<&'input str>) -
         next_input,
         Token {
             white_space,
-            lexeme: &input[..len + 2],
+            lexeme: &input.as_bytes()[..len + 2],
             ty: Type::Str(inner.as_bytes()),
         },
     ))
@@ -288,7 +290,7 @@ fn parse_semicolon<'input>(input: &'input str, white_space: Option<&'input str>)
         Token {
             white_space,
             ty: Type::SemiColon,
-            lexeme,
+            lexeme: lexeme.as_bytes(),
         },
     ))
 }
@@ -331,7 +333,7 @@ impl<'input> LexerImpl<'input> {
 
                 Ok(Token {
                     white_space,
-                    lexeme,
+                    lexeme: lexeme.as_bytes(),
                     ty: Type::BlockStart(Block::Paren)
                 })
             },
@@ -342,7 +344,7 @@ impl<'input> LexerImpl<'input> {
 
                 Ok(Token {
                     white_space,
-                    lexeme,
+                    lexeme: lexeme.as_bytes(),
                     ty: Type::BlockStart(Block::Square)
                 })
             },
@@ -353,7 +355,7 @@ impl<'input> LexerImpl<'input> {
 
                 Ok(Token {
                     white_space,
-                    lexeme,
+                    lexeme: lexeme.as_bytes(),
                     ty: Type::BlockStart(Block::Curly)
                 })
             },
@@ -365,7 +367,7 @@ impl<'input> LexerImpl<'input> {
 
                     Ok(Token {
                         white_space,
-                        lexeme,
+                        lexeme: lexeme.as_bytes(),
                         ty: Type::BlockEnd(Block::Paren)
                     })
                 } else {
@@ -383,7 +385,7 @@ impl<'input> LexerImpl<'input> {
                     self.input = input;
                     Ok(Token {
                         white_space,
-                        lexeme,
+                        lexeme: lexeme.as_bytes(),
                         ty: Type::BlockEnd(Block::Square)
                     })
                 } else {
@@ -402,7 +404,7 @@ impl<'input> LexerImpl<'input> {
                     
                     Ok(Token {
                         white_space,
-                        lexeme,
+                        lexeme: lexeme.as_bytes(),
                         ty: Type::BlockEnd(Block::Curly)
                     })
                 } else {
@@ -445,6 +447,14 @@ impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
             },
             Err(_) => None
         };
+
+        if self.input.is_empty() {
+            return Err(Error {
+                input: self.input,
+                meta: Meta::Token,
+                ty: error::Type::EmptyInput
+            })
+        }
 
         forward!(parse_semicolon(self.input, white_space));
         forward!(parse_ident(self.input, white_space));
