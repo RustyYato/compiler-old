@@ -244,6 +244,7 @@ pub fn parse_symbol<'input>(input: &'input str, white_space: Option<&'input str>
             | b"+" | b"-" | b"*" | b"/"
             | b"!" | b"?" | b"." | b"$"
             | b"&" | b"|" | b"^" | b"~"
+            | b">" | b"<"
                 => ret_op!(lexeme, input),
             _ => ()
         }
