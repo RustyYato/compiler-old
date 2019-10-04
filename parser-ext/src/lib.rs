@@ -3,7 +3,7 @@ pub mod ast {
     
     pub type AstPtr<'alloc, 'input> = &'alloc Ast<'alloc, 'input>;
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub enum Ast<'alloc, 'input> {
         // Literal(item::Literal<'input>),
         Ident(Token<'input>),
@@ -15,6 +15,11 @@ pub mod ast {
         PostOp {
             expr: AstPtr<'alloc, 'input>,
             op: Token<'input>,
+        },
+        BinOp {
+            left: AstPtr<'alloc, 'input>,
+            op: Token<'input>,
+            right: AstPtr<'alloc, 'input>,
         }
     }
 
@@ -28,7 +33,10 @@ pub mod ast {
                 } => write!(f, "{}{}{}", open, inner, close),
                 Self::PostOp {
                     expr, op
-                } => write!(f, "{}{}", expr, op),
+                } => write!(f, "({}{})", expr, op),
+                Self::BinOp {
+                    left, op, right
+                } => write!(f, "({}{}{})", left, op, right),
             }
         }
     }

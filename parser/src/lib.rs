@@ -29,7 +29,7 @@ pub struct ParserImpl<'input, L: Lexer<'input>> {
 impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     pub fn new(lexer: L) -> Self {
         Self {
-            lexer: LLNPeek::new(lexer),
+            lexer: LLNPeek::new(lexer, 4),
         }
     }
 
@@ -37,66 +37,65 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         &mut self,
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
-        let mut ast: Option<Ast<'alloc, 'input>> = None;
+        self.parse_dot(alloc)
+    }
 
-        macro_rules! return_or {
-            ($($or:tt)*) => {
-                match ast {
-                    Some(ast) => return Ok(ast),
-                    None => {
-                        $($or)*
-                    }
-                }
-            }
-        }
-
-        loop {
-            self.lexer.reserve_tokens(1);
-            
-            let token = match self.lexer.peek() {
-                Some(&Ok(token)) => token,
-                Some(&Err(_)) => return_or!(self.lexer.parse_token()?),
-                None => return_or!(return Err(Error::EmptyInput))
-            };
-        
-            match token.ty {
-                token::Type::Ident => {
-                    let _ = self.lexer.parse_token();
-                    ast = Some(Ast::Ident(token))
-                }
-                token::Type::BlockStart(token::Block::Paren) => {
-                    let _ = self.lexer.parse_token();
-                    let open = token;
-
-                    let expr = self.parse_expr(alloc)?;
-                    let expr = alloc.insert(expr);
-
-                    let close = self.lexer.parse_token()?;
-
-                    if let token::Type::BlockEnd(token::Block::Paren) = close.ty {
-                        ast = Some(Ast::Block {
-                            open,
-                            close,
-                            inner: expr
-                        });
-                    } else {
-                        return Err(Error::EndOfBlockNotFound(token::Block::Paren, close))
-                    }
-                }
-                token::Type::Symbol => {
-                    match token.lexeme {
-                        ".*" => {
-                            ast = Some(Ast::PostOp {
-                                expr: alloc.insert(ast.ok_or(Error::NoExpression)?),
-                                op: token
-                            });
-                        },
-                        _ => return_or!(unimplemented!("symbol {:?}", token.lexeme))
-                    }
-                    let _ = self.lexer.parse_token();
-                }
-                x => return_or!(unimplemented!("unknown {:?}", x))
-            }
+    fn parse_base<'alloc>(&mut self) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
+        match self.lexer.parse_token()? {
+            ident@Token { ty: token::Type::Ident, .. } => Ok(Ast::Ident(ident)),
+            // ident@Token { ty: token::Type::Symbol, lexeme: b"(", .. } => Ok(Ast::Ident(ident)),
+            _ => unimplemented!(),
         }
     }
+
+    fn parse_dot<'alloc>(
+        &mut self,
+        alloc: Alloc<'alloc, 'input>,
+    ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
+        let mut expr = self.parse_base()?;
+        
+        loop {
+            self.lexer.reserve_tokens(1);
+
+            let token = match self.lexer.parse_token() {
+                e@Err(_) => {
+                    self.lexer.push(e);
+                    break
+                },
+                Ok(token) => token
+            };
+
+            let mut is_done = true;
+
+            if let token::Type::Symbol = token.ty {
+                is_done = false;
+
+                match token.lexeme {
+                    b".*" => {
+                        expr = Ast::PostOp {
+                            expr: alloc.insert(expr),
+                            op: token
+                        };
+                    },
+                    b"." => {
+                        expr = Ast::BinOp {
+                            right: alloc.insert(self.parse_base()?),
+                            left: alloc.insert(expr),
+                            op: token
+                        };
+                    }
+                    _ => is_done = true,
+                }
+            }
+
+            if is_done {
+                self.lexer.push(Ok(token));
+                break
+            }
+        }
+        
+        Ok(expr)
+    }
+
+    // fn parse_shift()
 }
