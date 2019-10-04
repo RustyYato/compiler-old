@@ -49,33 +49,33 @@ impl<'input, L: Lexer<'input> + ?Sized> Lexer<'input> for LLNPeek<L, TokenRes<'i
 }
 
 impl<'input, L: Lexer<'input> + ?Sized> LLNPeek<L, TokenRes<'input, L>> {
+    #[inline]
     pub fn reserve_tokens(&mut self, n: usize) {
         let Self { peek, inner } = self;
-        let N = peek.capacity();
         
         if peek.len() < n {
-            let n = N.min(n);
+            let n = peek.capacity().min(n);
             let len = peek.len();
 
-            for i in 0..(n - len) {
+            for _ in 0..(n - len) {
                 peek.push_front(inner.parse_token());
             }
         }
     }
-    
-    pub fn peek_len(&self) -> usize {
-        self.peek.len()
-    }
 }
+
 impl<T, Inner: ?Sized> LLNPeek<Inner, T> {
+    #[inline]
     pub fn peek_iter(&self) -> impl Iterator<Item = &T> {
         self.peek.iter()
     }
     
+    #[inline]
     pub fn peek(&self) -> Option<&T> {
         self.peek.iter().next()
     }
 
+    #[inline]
     pub fn try_push(&mut self, value: T) -> Result<(), T> {
         if self.peek.len() < self.peek.capacity() {
             self.peek.push_front(value);
@@ -85,12 +85,14 @@ impl<T, Inner: ?Sized> LLNPeek<Inner, T> {
         }
     }
 
+    #[inline]
     pub fn push(&mut self, value: T) {
         assert!(self.peek.len() < self.peek.capacity(), "Tried to push into a full buffer");
         self.peek.push_front(value);
     }
 
-    pub fn len(&self) -> usize {
+    #[inline]
+    pub fn peek_len(&self) -> usize {
         self.peek.len()
     }
 }
