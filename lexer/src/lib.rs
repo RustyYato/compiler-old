@@ -373,7 +373,7 @@ pub fn parse_block<'input>(
                     white_space,
                     lexeme: lexeme.as_bytes(),
                     ty: Type::BlockStart(Block::Paren),
-                }
+                },
             ))
         }
         Some("[") => {
@@ -386,7 +386,7 @@ pub fn parse_block<'input>(
                     white_space,
                     lexeme: lexeme.as_bytes(),
                     ty: Type::BlockStart(Block::Square),
-                }
+                },
             ))
         }
         Some("{") => {
@@ -399,7 +399,7 @@ pub fn parse_block<'input>(
                     white_space,
                     lexeme: lexeme.as_bytes(),
                     ty: Type::BlockStart(Block::Curly),
-                }
+                },
             ))
         }
         Some(")") => {
@@ -412,7 +412,7 @@ pub fn parse_block<'input>(
                         white_space,
                         lexeme: lexeme.as_bytes(),
                         ty: Type::BlockEnd(Block::Paren),
-                    }
+                    },
                 ))
             } else {
                 Err(Error {
@@ -432,7 +432,7 @@ pub fn parse_block<'input>(
                         white_space,
                         lexeme: lexeme.as_bytes(),
                         ty: Type::BlockEnd(Block::Square),
-                    }
+                    },
                 ))
             } else {
                 Err(Error {
@@ -452,7 +452,7 @@ pub fn parse_block<'input>(
                         white_space,
                         lexeme: lexeme.as_bytes(),
                         ty: Type::BlockEnd(Block::Curly),
-                    }
+                    },
                 ))
             } else {
                 Err(Error {
@@ -500,7 +500,7 @@ impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
             .or_else(move |_| parse_num(input, white_space))
             .or_else(move |_| parse_str(input, white_space))
             .or_else(move |_| parse_block(input, blocks, white_space))?;
-        
+
         self.input = input;
 
         Ok(token)
