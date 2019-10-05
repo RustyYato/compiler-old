@@ -19,41 +19,6 @@ pub struct ParserImpl<'input, L: Lexer<'input>> {
     lexer: Iter<'input, L>,
 }
 
-// macro_rules! parse_right_assoc {
-//     (
-//         ($self:ident, $alloc:ident, $expr:ident, $token:ident, $next:ident = $next_parse:ident)
-//         $($pattern:literal => $eval:expr)*
-//     ) => {
-//         parse_right_assoc! {
-//             ($self, _this, $alloc, $expr, $token, $next = $next_parse)
-//             $($pattern => $eval)*
-//         }
-//     };
-//     (
-//         ($self:ident, $this:ident, $alloc:ident, $expr:ident, $token:ident, $next:ident = $next_parse:ident)
-//         $($pattern:literal => $eval:expr)*
-//     ) => {
-//         let next = parse_right_assoc!(@next $self $alloc $next_parse)?;
-
-//         $self.parse_right_assoc(
-//             $alloc,
-//             next,
-//             &mut [$((
-//                 $pattern as &[_],
-//                 &mut |$this, $expr, $token| {
-//                     #[allow(unused)]
-//                     macro_rules! $next {
-//                         () => { parse_right_assoc!(@next $this $alloc $next_parse) };
-//                     }
-//                     Ok($eval)
-//                 }
-//             )),*]
-//         )
-//     };
-//     (@next $self:ident $alloc:ident parse_base) => { $self.parse_base() };
-//     (@next $self:ident $alloc:ident $next_parse:ident) => { $self.$next_parse($alloc) };
-// }
-
 macro_rules! parse_right_assoc {
     (
         ($self:ident, $alloc:ident, $expr:ident, $token:ident, $next:ident = $next_parse:ident)
@@ -115,12 +80,12 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
 
     #[inline]
     fn parse_base<'alloc>(&mut self) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
-        match self.lexer.parse_token()? {
-            ident @ Token {
-                ty: token::Type::Ident,
-                ..
-            } => Ok(Ast::Ident(ident)),
-            // ident@Token { ty: token::Type::Symbol, lexeme: b"(", .. } => Ok(Ast::Ident(ident)),
+        let token = self.lexer.parse_token()?;
+        match token.ty {
+            | token::Type::Ident
+            | token::Type::Int(_)
+            | token::Type::Float(_)
+            | token::Type::Str(_) => Ok(Ast::Value(token)),
             _ => unimplemented!(),
         }
     }
@@ -376,6 +341,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
                 self.parse_boolean_or(alloc)
             };
         }
+
         let mut expr_val = parse!()?;
 
         let mut expr = &mut expr_val;
@@ -423,11 +389,4 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
 
         Ok(expr_val)
     }
-}
-
-pub fn asm<'alloc, 'input>(
-    parser: &mut ParserImpl<'input, &mut dyn Lexer<'input, Input = &'input str>>,
-    alloc: Alloc<'alloc, 'input>,
-) -> Result<'input, Ast<'alloc, 'input>, &'input str> {
-    parser.parse_expr(alloc)
 }
