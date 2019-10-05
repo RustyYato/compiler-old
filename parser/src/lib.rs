@@ -135,7 +135,8 @@ macro_rules! parse_left_assoc {
         $expr = if let Ast::BinOp { right, .. } = $expr {
             right
         } else {
-            unreachable!()
+            debug_assert!(false, "unreachable: UNSOUND this will be unchecked in release mode!");
+            unsafe { std::hint::unreachable_unchecked() }
         }
     };
 }
