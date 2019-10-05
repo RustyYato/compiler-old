@@ -21,16 +21,16 @@ pub struct ParserImpl<'input, L: Lexer<'input>> {
 
 macro_rules! parse_right_assoc {
     (
-        ($self:ident, $alloc:ident, $expr:ident, $token:ident, $next:ident = $next_parse:ident)
-        $($pattern:pat => $eval:expr)*
+        ($self:ident, $alloc:ident, $next_parse:ident)
+        $($pattern:pat => $eval_ty:ident)*
     ) => {
-        macro_rules! $next {
+        macro_rules! parse {
             () => { $self.$next_parse($alloc) };
         }
-        let mut $expr = $next!()?;
+        let mut expr = parse!()?;
 
         loop {
-            let $token = match $self.lexer.parse_token() {
+            let token = match $self.lexer.parse_token() {
                 e@Err(_) => {
                     $self.lexer.push(e);
                     break
@@ -40,24 +40,40 @@ macro_rules! parse_right_assoc {
 
             let mut is_done = true;
 
-            if let token::Type::Symbol = $token.ty {
+            if let token::Type::Symbol = token.ty {
                 is_done = false;
 
-                match $token.lexeme {
+                match token.lexeme {
                     $($pattern => {
-                        $expr = $eval
+                        expr = parse_right_assoc!(@eval $eval_ty $alloc, parse, expr, token)
                     }),*
                     _ => is_done = true,
                 }
             }
 
             if is_done {
-                $self.lexer.push(Ok($token));
+                $self.lexer.push(Ok(token));
                 break
             }
         }
 
-        Ok($expr)
+        Ok(expr)
+    };
+    (@eval post $alloc:ident, $next:ident, $expr:expr, $op:expr) => {
+        Ast::PostOp {
+            expr: $alloc.insert($expr),
+            op: $op
+        }
+    };
+    (@eval bin $alloc:ident, $next:ident, $expr:expr, $op:expr) => {
+        Ast::BinOp {
+            right: $alloc.insert($next!()?),
+            left: $alloc.insert($expr),
+            op: $op
+        }
+    };
+    (@eval $eval_ty:ident $alloc:ident, $next:ident, $expr:expr, $op:expr) => {
+        compile_error!(stringify!($eval_ty));
     };
 }
 
@@ -73,7 +89,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         &mut self,
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
-        self.parse_function(alloc)
+        self.parse_assign(alloc)
     }
 
     #[inline]
@@ -100,7 +116,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
                     Err(Error::EndOfBlockNotFound)
                 }
             }
-            
+
             _ => unimplemented!("TOKEN = {:?}", token),
         }
     }
@@ -155,18 +171,10 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         parse_right_assoc! {
-            (self, alloc, expr, token, parse = parse_base)
+            (self, alloc, parse_base)
 
-            b".*" => Ast::PostOp {
-                expr: alloc.insert(expr),
-                op: token
-            }
-
-            b"." => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
+            b".*" => post
+            b"." => bin
         }
     }
     
@@ -215,19 +223,10 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         parse_right_assoc! {
-            (self, alloc, expr, token, parse = parse_negation)
+            (self, alloc, parse_negation)
 
-            b">>>" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
-
-            b"<<<" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
+            b">>>" => bin
+            b"<<<" => bin
         }
     }
 
@@ -237,13 +236,9 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         parse_right_assoc! {
-            (self, alloc, expr, token, parse = parse_shift)
+            (self, alloc, parse_shift)
 
-            b"&" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
+            b"&" => bin
         }
     }
 
@@ -253,13 +248,9 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         parse_right_assoc! {
-            (self, alloc, expr, token, parse = parse_bit_and)
+            (self, alloc, parse_bit_and)
 
-            b"|" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
+            b"|" => bin
         }
     }
 
@@ -269,19 +260,10 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         parse_right_assoc! {
-            (self, alloc, expr, token, parse = parse_bit_or)
+            (self, alloc, parse_bit_or)
 
-            b"*" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
-
-            b"/" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
+            b"*" => bin
+            b"/" => bin
         }
     }
 
@@ -291,19 +273,10 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         parse_right_assoc! {
-            (self, alloc, expr, token, parse = parse_arith_prod)
+            (self, alloc, parse_arith_prod)
 
-            b"+" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
-
-            b"-" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
+            b"+" => bin
+            b"-" => bin
         }
     }
 
@@ -313,43 +286,14 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         parse_right_assoc! {
-            (self, alloc, expr, token, parse = parse_arith_sum)
+            (self, alloc, parse_arith_sum)
 
-            b"==" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
-
-            b"!=" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
-
-            b">" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
-
-            b"<" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
-
-            b"<=" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
-
-            b">=" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
+            b"==" => bin
+            b"!=" => bin
+            b">" => bin
+            b"<" => bin
+            b"<=" => bin
+            b">=" => bin
         }
     }
 
@@ -359,13 +303,9 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         parse_right_assoc! {
-            (self, alloc, expr, token, parse = parse_comparison)
+            (self, alloc, parse_comparison)
 
-            b"&&" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
+            b"&&" => bin
         }
     }
 
@@ -375,13 +315,9 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         parse_right_assoc! {
-            (self, alloc, expr, token, parse = parse_boolean_and)
+            (self, alloc, parse_boolean_and)
 
-            b"||" => Ast::BinOp {
-                right: alloc.insert(parse!()?),
-                left: alloc.insert(expr),
-                op: token
-            }
+            b"||" => bin
         }
     }
 
@@ -416,6 +352,81 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
 
                 match token.lexeme {
                     b"->" => {
+                        let right = alloc.insert(parse!()?);
+                        let left = std::mem::replace(expr, Ast::Uninit);
+
+                        *expr = Ast::BinOp {
+                            left: alloc.insert(left),
+                            right,
+                            op: token,
+                        };
+
+                        expr = if let Ast::BinOp { right, .. } = expr {
+                            right
+                        } else {
+                            unreachable!()
+                        }
+                    }
+                    _ => is_done = true,
+                }
+            }
+
+            if is_done {
+                self.lexer.push(Ok(token));
+                break;
+            }
+        }
+
+        Ok(expr_val)
+    }
+
+    #[inline]
+    fn parse_assign<'alloc>(
+        &mut self,
+        alloc: Alloc<'alloc, 'input>,
+    ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
+        macro_rules! parse {
+            () => {
+                self.parse_function(alloc)
+            };
+        }
+
+        let mut expr_val = parse!()?;
+
+        let mut expr = &mut expr_val;
+
+        loop {
+            let token = match self.lexer.parse_token() {
+                e @ Err(_) => {
+                    self.lexer.push(e);
+                    break;
+                }
+                Ok(token) => token,
+            };
+
+            let mut is_done = true;
+
+            if let token::Type::Symbol = token.ty {
+                is_done = false;
+
+                match token.lexeme {
+                    b"=" => {
+                        let right = alloc.insert(parse!()?);
+                        let left = std::mem::replace(expr, Ast::Uninit);
+
+                        *expr = Ast::BinOp {
+                            left: alloc.insert(left),
+                            right,
+                            op: token,
+                        };
+
+                        expr = if let Ast::BinOp { right, .. } = expr {
+                            right
+                        } else {
+                            unreachable!()
+                        }
+                    }
+                    b":=" => {
                         let right = alloc.insert(parse!()?);
                         let left = std::mem::replace(expr, Ast::Uninit);
 
