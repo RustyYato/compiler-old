@@ -1,21 +1,3 @@
-#![feature(test)]
-
-extern crate test;
-
-use test::Bencher;
-
-// #[bench]
-// pub fn time_me(b: &mut Bencher) {
-//     let file = std::fs::read_to_string("/test.rs").expect("Could not read file");
-
-//     b.iter(|| {
-//         let mut iter = lexer::iter(&file);
-
-//         (&mut iter).for_each(drop);
-
-//         iter
-//     });
-// }
 
 fn main() {
     use lexer_ext::token::Lexer;
