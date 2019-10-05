@@ -2,7 +2,7 @@
 
 use lexer_ext::{
     error::{self, Error, Meta, TokenRes},
-    token::{Block, Iter, Token, Type},
+    token::{Block, Token, Type},
 };
 
 pub type Result<I, T> = std::result::Result<(I, T), Error<I>>;
@@ -346,117 +346,127 @@ impl<'input> LexerImpl<'input> {
     }
 }
 
-impl<'input> LexerImpl<'input> {
-    #[inline]
-    fn parse_block(&mut self, white_space: Option<&'input str>) -> TokenRes<'input, Self> {
-        let input = self.input;
+#[inline]
+pub fn parse_block<'input>(
+    input: &'input str,
+    blocks: &mut block_vec::BlockVec,
+    white_space: Option<&'input str>,
+) -> Result<&'input str, Token<'input>> {
+    if input.is_empty() {
+        return Err(Error {
+            input,
+            meta: Meta::Block,
+            ty: error::Type::EmptyInput,
+        });
+    }
 
-        if input.is_empty() {
-            return Err(Error {
+    let first = input.get(0..1);
+
+    match first {
+        Some("(") => {
+            let (lexeme, input) = input.split_at(1);
+            blocks.push(Block::Paren);
+
+            Ok((
                 input,
-                meta: Meta::Block,
-                ty: error::Type::EmptyInput,
-            });
-        }
-
-        let first = input.get(0..1);
-
-        match first {
-            Some("(") => {
-                let (lexeme, input) = self.input.split_at(1);
-                self.input = input;
-                self.blocks.push(Block::Paren);
-
-                Ok(Token {
+                Token {
                     white_space,
                     lexeme: lexeme.as_bytes(),
                     ty: Type::BlockStart(Block::Paren),
-                })
-            }
-            Some("[") => {
-                let (lexeme, input) = self.input.split_at(1);
-                self.input = input;
-                self.blocks.push(Block::Square);
+                }
+            ))
+        }
+        Some("[") => {
+            let (lexeme, input) = input.split_at(1);
+            blocks.push(Block::Square);
 
-                Ok(Token {
+            Ok((
+                input,
+                Token {
                     white_space,
                     lexeme: lexeme.as_bytes(),
                     ty: Type::BlockStart(Block::Square),
-                })
-            }
-            Some("{") => {
-                let (lexeme, input) = self.input.split_at(1);
-                self.input = input;
-                self.blocks.push(Block::Curly);
+                }
+            ))
+        }
+        Some("{") => {
+            let (lexeme, input) = input.split_at(1);
+            blocks.push(Block::Curly);
 
-                Ok(Token {
+            Ok((
+                input,
+                Token {
                     white_space,
                     lexeme: lexeme.as_bytes(),
                     ty: Type::BlockStart(Block::Curly),
-                })
-            }
-            Some(")") => {
-                let (lexeme, input) = self.input.split_at(1);
+                }
+            ))
+        }
+        Some(")") => {
+            let (lexeme, input) = input.split_at(1);
 
-                if let Some(Block::Paren) = self.blocks.pop() {
-                    self.input = input;
-
-                    Ok(Token {
+            if let Some(Block::Paren) = blocks.pop() {
+                Ok((
+                    input,
+                    Token {
                         white_space,
                         lexeme: lexeme.as_bytes(),
                         ty: Type::BlockEnd(Block::Paren),
-                    })
-                } else {
-                    Err(Error {
-                        input: self.input,
-                        meta: Meta::Block,
-                        ty: error::Type::BlockEndError(Block::Paren),
-                    })
-                }
+                    }
+                ))
+            } else {
+                Err(Error {
+                    input,
+                    meta: Meta::Block,
+                    ty: error::Type::BlockEndError(Block::Paren),
+                })
             }
-            Some("]") => {
-                let (lexeme, input) = self.input.split_at(1);
+        }
+        Some("]") => {
+            let (lexeme, input) = input.split_at(1);
 
-                if let Some(Block::Square) = self.blocks.pop() {
-                    self.input = input;
-                    Ok(Token {
+            if let Some(Block::Square) = blocks.pop() {
+                Ok((
+                    input,
+                    Token {
                         white_space,
                         lexeme: lexeme.as_bytes(),
                         ty: Type::BlockEnd(Block::Square),
-                    })
-                } else {
-                    Err(Error {
-                        input: self.input,
-                        meta: Meta::Block,
-                        ty: error::Type::BlockEndError(Block::Square),
-                    })
-                }
+                    }
+                ))
+            } else {
+                Err(Error {
+                    input,
+                    meta: Meta::Block,
+                    ty: error::Type::BlockEndError(Block::Square),
+                })
             }
-            Some("}") => {
-                let (lexeme, input) = self.input.split_at(1);
+        }
+        Some("}") => {
+            let (lexeme, input) = input.split_at(1);
 
-                if let Some(Block::Curly) = self.blocks.pop() {
-                    self.input = input;
-
-                    Ok(Token {
+            if let Some(Block::Curly) = blocks.pop() {
+                Ok((
+                    input,
+                    Token {
                         white_space,
                         lexeme: lexeme.as_bytes(),
                         ty: Type::BlockEnd(Block::Curly),
-                    })
-                } else {
-                    Err(Error {
-                        input: self.input,
-                        meta: Meta::Block,
-                        ty: error::Type::BlockEndError(Block::Curly),
-                    })
-                }
+                    }
+                ))
+            } else {
+                Err(Error {
+                    input,
+                    meta: Meta::Block,
+                    ty: error::Type::BlockEndError(Block::Curly),
+                })
             }
-            _ => Err(Error {
-                input,
-                meta: Meta::Block,
-                ty: error::Type::BlockStartError,
-            }),
         }
+        _ => Err(Error {
+            input,
+            meta: Meta::Block,
+            ty: error::Type::BlockStartError,
+        }),
     }
 }
 
@@ -465,15 +475,6 @@ impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
 
     #[inline]
     fn parse_token(&mut self) -> TokenRes<'input, Self> {
-        macro_rules! forward {
-            ($res:expr) => {
-                if let Ok((input, token)) = $res {
-                    self.input = input;
-                    return Ok(token);
-                }
-            };
-        }
-
         let white_space = match parse_white_space(self.input) {
             Ok((input, white_space)) => {
                 self.input = input;
@@ -490,16 +491,18 @@ impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
             });
         }
 
-        forward!(parse_semicolon(self.input, white_space));
-        forward!(parse_ident(self.input, white_space));
-        forward!(parse_num(self.input, white_space));
-        forward!(parse_symbol(self.input, white_space));
-        forward!(parse_str(self.input, white_space));
+        let input = self.input;
+        let blocks = &mut self.blocks;
 
-        self.parse_block(white_space).map_err(|_| Error {
-            input: self.input,
-            meta: Meta::Token,
-            ty: error::Type::InvalidToken,
-        })
+        let (input, token) = parse_semicolon(input, white_space)
+            .or_else(move |_| parse_ident(input, white_space))
+            .or_else(move |_| parse_symbol(input, white_space))
+            .or_else(move |_| parse_num(input, white_space))
+            .or_else(move |_| parse_str(input, white_space))
+            .or_else(move |_| parse_block(input, blocks, white_space))?;
+        
+        self.input = input;
+
+        Ok(token)
     }
 }
