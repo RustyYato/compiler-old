@@ -7,6 +7,7 @@ jobs:
       matrix:
         os: [windows-latest]
         rust: [stable, nightly]
+        components: ['fmt']
 
     steps:
     - uses: hecrj/setup-rust-action@v1
