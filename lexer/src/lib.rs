@@ -492,6 +492,7 @@ impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
 
         forward!(parse_semicolon(self.input, white_space));
         forward!(parse_ident(self.input, white_space));
+        forward!(parse_num(self.input, white_space));
         forward!(parse_symbol(self.input, white_space));
         forward!(parse_str(self.input, white_space));
 
