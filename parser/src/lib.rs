@@ -201,7 +201,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         let token = self.lexer.parse_token()?;
         match token.ty {
-            | token::Type::Ident
+            token::Type::Ident
             | token::Type::Int(_)
             | token::Type::Float(_)
             | token::Type::Str(_) => Ok(Ast::Value(token)),
@@ -212,7 +212,11 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
                 let close = self.lexer.parse_token()?;
                 let inner = alloc.insert(inner);
 
-                if let Token { ty: token::Type::BlockEnd(token::Block::Paren), .. } = close {
+                if let Token {
+                    ty: token::Type::BlockEnd(token::Block::Paren),
+                    ..
+                } = close
+                {
                     Ok(Ast::Block { open, inner, close })
                 } else {
                     Err(Error::EndOfBlockNotFound)
@@ -233,10 +237,10 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         loop {
             let token = match self.lexer.parse_token() {
                 Ok(token) => token,
-                e@Err(_) => {
+                e @ Err(_) => {
                     self.lexer.push(e);
-                    break
-                },
+                    break;
+                }
             };
 
             let mut is_done = true;
@@ -247,7 +251,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
 
             if is_done {
                 self.lexer.push(Ok(token));
-                break
+                break;
             } else {
                 tokens.push(token);
             }
@@ -256,7 +260,10 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         let mut expr = self.parse_dot(alloc)?;
 
         for op in tokens {
-            expr = Ast::PreOp { op, expr: alloc.insert(expr) };
+            expr = Ast::PreOp {
+                op,
+                expr: alloc.insert(expr),
+            };
         }
 
         Ok(expr)
@@ -314,7 +321,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         parse_function -> parse_boolean_or {
             b"->" => bin
         }
-        
+
         parse_assign -> parse_function {
             b"=" => bin
             b":=" => bin
