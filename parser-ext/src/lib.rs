@@ -1,10 +1,11 @@
 pub mod ast {
     use lexer_ext::token::{self, Token};
     
-    pub type AstPtr<'alloc, 'input> = &'alloc Ast<'alloc, 'input>;
+    pub type AstPtr<'alloc, 'input> = &'alloc mut Ast<'alloc, 'input>;
 
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, PartialEq)]
     pub enum Ast<'alloc, 'input> {
+        Uninit,
         // Literal(item::Literal<'input>),
         Ident(Token<'input>),
         Block {
@@ -37,6 +38,7 @@ pub mod ast {
                 Self::BinOp {
                     left, op, right
                 } => write!(f, "({}{}{})", left, op, right),
+                Self::Uninit => unreachable!(),
             }
         }
     }
@@ -51,7 +53,7 @@ pub mod ast {
             Str(&'input [u8])
         }
 
-        #[derive(Debug, Clone)]
+        #[derive(Debug)]
         pub struct Let<'alloc, 'input> {
             pub kw_let: Token<'input>,
             pub ws_1: Option<Token<'input>>,
