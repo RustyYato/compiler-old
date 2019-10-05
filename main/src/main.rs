@@ -1,4 +1,3 @@
-
 fn main() {
     use lexer_ext::token::Lexer;
 
