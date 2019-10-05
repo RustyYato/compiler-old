@@ -77,6 +77,69 @@ macro_rules! parse_right_assoc {
     };
 }
 
+macro_rules! parse_left_assoc {
+    (
+        ($self:ident, $alloc:ident, $next_parse:ident)
+        $($pattern:pat => $eval_ty:ident)*
+    ) => {
+        macro_rules! parse {
+            () => {
+                $self.$next_parse($alloc)
+            };
+        }
+
+        let mut expr_val = parse!()?;
+
+        let mut expr = &mut expr_val;
+
+        loop {
+            let token = match $self.lexer.parse_token() {
+                e @ Err(_) => {
+                    $self.lexer.push(e);
+                    break;
+                }
+                Ok(token) => token,
+            };
+
+            let mut is_done = true;
+
+            if let token::Type::Symbol = token.ty {
+                is_done = false;
+
+                match token.lexeme {
+                    $($pattern => {
+                        parse_left_assoc! { @eval $eval_ty $alloc, parse, expr, token }
+                    }),*
+                    _ => is_done = true,
+                }
+            }
+
+            if is_done {
+                $self.lexer.push(Ok(token));
+                break;
+            }
+        }
+
+        Ok(expr_val)
+    };
+    (@eval bin $alloc:ident, $next:ident, $expr:expr, $op:expr) => {
+        let right = $alloc.insert($next!()?);
+        let left = std::mem::replace($expr, Ast::Uninit);
+
+        *$expr = Ast::BinOp {
+            left: $alloc.insert(left),
+            right,
+            op: $op,
+        };
+
+        $expr = if let Ast::BinOp { right, .. } = $expr {
+            right
+        } else {
+            unreachable!()
+        }
+    };
+}
+
 impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     pub fn new(lexer: L) -> Self {
         Self {
@@ -174,6 +237,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
             (self, alloc, parse_base)
 
             b".*" => post
+            b"?" => post
             b"." => bin
         }
     }
@@ -326,58 +390,11 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         &mut self,
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
-        macro_rules! parse {
-            () => {
-                self.parse_boolean_or(alloc)
-            };
+        parse_left_assoc! {
+            (self, alloc, parse_boolean_or)
+
+            b"->" => bin
         }
-
-        let mut expr_val = parse!()?;
-
-        let mut expr = &mut expr_val;
-
-        loop {
-            let token = match self.lexer.parse_token() {
-                e @ Err(_) => {
-                    self.lexer.push(e);
-                    break;
-                }
-                Ok(token) => token,
-            };
-
-            let mut is_done = true;
-
-            if let token::Type::Symbol = token.ty {
-                is_done = false;
-
-                match token.lexeme {
-                    b"->" => {
-                        let right = alloc.insert(parse!()?);
-                        let left = std::mem::replace(expr, Ast::Uninit);
-
-                        *expr = Ast::BinOp {
-                            left: alloc.insert(left),
-                            right,
-                            op: token,
-                        };
-
-                        expr = if let Ast::BinOp { right, .. } = expr {
-                            right
-                        } else {
-                            unreachable!()
-                        }
-                    }
-                    _ => is_done = true,
-                }
-            }
-
-            if is_done {
-                self.lexer.push(Ok(token));
-                break;
-            }
-        }
-
-        Ok(expr_val)
     }
 
     #[inline]
@@ -385,74 +402,12 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         &mut self,
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
-        macro_rules! parse {
-            () => {
-                self.parse_function(alloc)
-            };
+        parse_left_assoc! {
+            (self, alloc, parse_function)
+
+            b"=" => bin
+            b":=" => bin
         }
-
-        let mut expr_val = parse!()?;
-
-        let mut expr = &mut expr_val;
-
-        loop {
-            let token = match self.lexer.parse_token() {
-                e @ Err(_) => {
-                    self.lexer.push(e);
-                    break;
-                }
-                Ok(token) => token,
-            };
-
-            let mut is_done = true;
-
-            if let token::Type::Symbol = token.ty {
-                is_done = false;
-
-                match token.lexeme {
-                    b"=" => {
-                        let right = alloc.insert(parse!()?);
-                        let left = std::mem::replace(expr, Ast::Uninit);
-
-                        *expr = Ast::BinOp {
-                            left: alloc.insert(left),
-                            right,
-                            op: token,
-                        };
-
-                        expr = if let Ast::BinOp { right, .. } = expr {
-                            right
-                        } else {
-                            unreachable!()
-                        }
-                    }
-                    b":=" => {
-                        let right = alloc.insert(parse!()?);
-                        let left = std::mem::replace(expr, Ast::Uninit);
-
-                        *expr = Ast::BinOp {
-                            left: alloc.insert(left),
-                            right,
-                            op: token,
-                        };
-
-                        expr = if let Ast::BinOp { right, .. } = expr {
-                            right
-                        } else {
-                            unreachable!()
-                        }
-                    }
-                    _ => is_done = true,
-                }
-            }
-
-            if is_done {
-                self.lexer.push(Ok(token));
-                break;
-            }
-        }
-
-        Ok(expr_val)
     }
 }
 
