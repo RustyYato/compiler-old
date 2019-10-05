@@ -81,7 +81,8 @@ pub mod error {
     pub enum Error<'input, I> {
         EmptyInput,
         NoExpression,
-        EndOfBlockNotFound(Block, Token<'input>),
+        EndOfBlockNotFound,
+        Token(Token<'input>),
         ExpectedSymbol(&'static [&'static str]),
         Lex(lexer_ext::error::Error<I>),
     }

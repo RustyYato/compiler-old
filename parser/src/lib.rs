@@ -25,7 +25,7 @@ macro_rules! parse_right_assoc {
         $($pattern:pat => $eval:expr)*
     ) => {
         macro_rules! $next {
-            () => { parse_right_assoc!(@next $self $alloc $next_parse) };
+            () => { $self.$next_parse($alloc) };
         }
         let mut $expr = $next!()?;
 
@@ -59,8 +59,6 @@ macro_rules! parse_right_assoc {
 
         Ok($expr)
     };
-    (@next $self:ident $alloc:ident parse_base) => { $self.parse_base() };
-    (@next $self:ident $alloc:ident $next_parse:ident) => { $self.$next_parse($alloc) };
 }
 
 impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
@@ -79,14 +77,31 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     }
 
     #[inline]
-    fn parse_base<'alloc>(&mut self) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
+    fn parse_base<'alloc>(
+        &mut self,
+        alloc: Alloc<'alloc, 'input>,
+    ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         let token = self.lexer.parse_token()?;
         match token.ty {
             | token::Type::Ident
             | token::Type::Int(_)
             | token::Type::Float(_)
             | token::Type::Str(_) => Ok(Ast::Value(token)),
-            _ => unimplemented!(),
+
+            token::Type::BlockStart(token::Block::Paren) => {
+                let open = token;
+                let inner = self.parse_expr(alloc)?;
+                let close = self.lexer.parse_token()?;
+                let inner = alloc.insert(inner);
+
+                if let Token { ty: token::Type::BlockEnd(token::Block::Paren), .. } = close {
+                    Ok(Ast::Block { open, inner, close })
+                } else {
+                    Err(Error::EndOfBlockNotFound)
+                }
+            }
+            
+            _ => unimplemented!("TOKEN = {:?}", token),
         }
     }
 
