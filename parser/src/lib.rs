@@ -154,6 +154,45 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
             }
         }
     }
+    
+    #[inline]
+    fn parse_negation<'alloc>(
+        &mut self,
+        alloc: Alloc<'alloc, 'input>,
+    ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
+        let mut tokens = Vec::new();
+
+        loop {
+            let token = match self.lexer.parse_token() {
+                Ok(token) => token,
+                e@Err(_) => {
+                    self.lexer.push(e);
+                    break
+                },
+            };
+
+            let mut is_done = true;
+
+            if let token::Type::Symbol = token.ty {
+                is_done = token.lexeme != b"-";
+            }
+
+            if is_done {
+                self.lexer.push(Ok(token));
+                break
+            } else {
+                tokens.push(token);
+            }
+        }
+
+        let mut expr = self.parse_dot(alloc)?;
+
+        for op in tokens {
+            expr = Ast::PreOp { op, expr: alloc.insert(expr) };
+        }
+
+        Ok(expr)
+    }
 
     #[inline]
     fn parse_shift<'alloc>(
@@ -161,7 +200,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         parse_right_assoc! {
-            (self, alloc, expr, token, parse = parse_dot)
+            (self, alloc, expr, token, parse = parse_negation)
 
             b">>>" => Ast::BinOp {
                 right: alloc.insert(parse!()?),
@@ -245,7 +284,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
                 op: token
             }
 
-            b"|" => Ast::BinOp {
+            b"-" => Ast::BinOp {
                 right: alloc.insert(parse!()?),
                 left: alloc.insert(expr),
                 op: token
@@ -389,4 +428,11 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
 
         Ok(expr_val)
     }
+}
+
+pub fn asm<'alloc, 'input>(
+    parser: &mut ParserImpl<'input, &mut dyn Lexer<'input, Input = &'input [u8]>>,
+    alloc: Alloc<'alloc, 'input>
+) -> Result<'input, Ast<'alloc, 'input>, &'input [u8]> {
+    parser.parse_expr(alloc)
 }

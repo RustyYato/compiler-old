@@ -16,6 +16,10 @@ pub mod ast {
             expr: AstPtr<'alloc, 'input>,
             op: Token<'input>,
         },
+        PreOp {
+            op: Token<'input>,
+            expr: AstPtr<'alloc, 'input>,
+        },
         BinOp {
             left: AstPtr<'alloc, 'input>,
             op: Token<'input>,
@@ -30,6 +34,7 @@ pub mod ast {
                 Self::Value(token) => write!(f, "{}", token),
                 Self::Block { open, inner, close } => write!(f, "{}{}{}", open, inner, close),
                 Self::PostOp { expr, op } => write!(f, "({}{})", expr, op),
+                Self::PreOp { expr, op } => write!(f, "({}{})", op, expr),
                 Self::BinOp { left, op, right } => write!(f, "({}{}{})", left, op, right),
                 Self::Uninit => unreachable!(),
             }

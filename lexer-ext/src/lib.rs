@@ -29,7 +29,7 @@ pub mod token {
                 Type::SemiColon => write!(f, ";"),
                 Type::Int(_) => write!(f, "{}", lexeme),
                 Type::Float(_) => write!(f, "{}", lexeme),
-                Type::Str(_) => write!(f, "{:?}", lexeme),
+                Type::Str(_) => write!(f, "{}", lexeme),
                 Type::BlockStart(Block::Paren) => write!(f, "("),
                 Type::BlockStart(Block::Square) => write!(f, "["),
                 Type::BlockStart(Block::Curly) => write!(f, "{{"),
