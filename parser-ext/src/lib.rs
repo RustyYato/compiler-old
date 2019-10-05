@@ -6,8 +6,7 @@ pub mod ast {
     #[derive(Debug, PartialEq)]
     pub enum Ast<'alloc, 'input> {
         Uninit,
-        // Literal(item::Literal<'input>),
-        Ident(Token<'input>),
+        Value(Token<'input>),
         Block {
             open: Token<'input>,
             inner: AstPtr<'alloc, 'input>,
@@ -16,6 +15,10 @@ pub mod ast {
         PostOp {
             expr: AstPtr<'alloc, 'input>,
             op: Token<'input>,
+        },
+        PreOp {
+            op: Token<'input>,
+            expr: AstPtr<'alloc, 'input>,
         },
         BinOp {
             left: AstPtr<'alloc, 'input>,
@@ -28,9 +31,10 @@ pub mod ast {
     impl fmt::Display for Ast<'_, '_> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self {
-                Self::Ident(token) => write!(f, "{}", token),
+                Self::Value(token) => write!(f, "{}", token),
                 Self::Block { open, inner, close } => write!(f, "{}{}{}", open, inner, close),
                 Self::PostOp { expr, op } => write!(f, "({}{})", expr, op),
+                Self::PreOp { expr, op } => write!(f, "({}{})", op, expr),
                 Self::BinOp { left, op, right } => write!(f, "({}{}{})", left, op, right),
                 Self::Uninit => unreachable!(),
             }
@@ -77,7 +81,8 @@ pub mod error {
     pub enum Error<'input, I> {
         EmptyInput,
         NoExpression,
-        EndOfBlockNotFound(Block, Token<'input>),
+        EndOfBlockNotFound,
+        Token(Token<'input>),
         ExpectedSymbol(&'static [&'static str]),
         Lex(lexer_ext::error::Error<I>),
     }

@@ -248,9 +248,8 @@ pub fn parse_symbol<'input>(
         let lexeme = lexeme.as_bytes();
 
         match lexeme {
-            b".*" | b"::" | b"==" | b"!=" | b"<=" | b">=" | b"&&" | b"||" | b"->" | b"=>" => {
-                ret_op!(lexeme, input)
-            }
+            b".*" | b"::" | b"==" | b"!=" | b"<=" | b">=" | b"&&" | b"||" | b"->" | b"=>"
+            | b":=" => ret_op!(lexeme, input),
             _ => (),
         }
     }
@@ -261,7 +260,7 @@ pub fn parse_symbol<'input>(
 
         match lexeme {
             b"+" | b"-" | b"*" | b"/" | b"!" | b"?" | b"." | b"$" | b"&" | b"|" | b"^" | b"~"
-            | b">" | b"<" => ret_op!(lexeme, input),
+            | b">" | b"<" | b"=" => ret_op!(lexeme, input),
             _ => (),
         }
     }
