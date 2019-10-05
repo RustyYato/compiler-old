@@ -1,4 +1,4 @@
-name: Vec Utils
+name: Test
 on: [push]
 jobs:
   test:
