@@ -1,6 +1,6 @@
 use lexer_ext::{
+    error::TokenRes,
     token::{self, Lexer, Token},
-    error::TokenRes
 };
 use lln_peek::LLNPeek;
 
@@ -63,7 +63,7 @@ macro_rules! parse_right_assoc {
             () => { parse_right_assoc!(@next $self $alloc $next_parse) };
         }
         let mut $expr = $next!()?;
-        
+
         loop {
             let $token = match $self.lexer.parse_token() {
                 e@Err(_) => {
@@ -91,7 +91,7 @@ macro_rules! parse_right_assoc {
                 break
             }
         }
-        
+
         Ok($expr)
     };
     (@next $self:ident $alloc:ident parse_base) => { $self.parse_base() };
@@ -116,7 +116,10 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     #[inline]
     fn parse_base<'alloc>(&mut self) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         match self.lexer.parse_token()? {
-            ident@Token { ty: token::Type::Ident, .. } => Ok(Ast::Ident(ident)),
+            ident @ Token {
+                ty: token::Type::Ident,
+                ..
+            } => Ok(Ast::Ident(ident)),
             // ident@Token { ty: token::Type::Symbol, lexeme: b"(", .. } => Ok(Ast::Ident(ident)),
             _ => unimplemented!(),
         }
@@ -130,24 +133,27 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         mut expr: Ast<'alloc, 'input>,
         ops: &mut [(
             &[u8],
-            &mut dyn FnMut(&mut Self, Ast<'alloc, 'input>, Token<'input>) -> Result<'input, Ast<'alloc, 'input>, L::Input>
-        )]
+            &mut dyn FnMut(
+                &mut Self,
+                Ast<'alloc, 'input>,
+                Token<'input>,
+            ) -> Result<'input, Ast<'alloc, 'input>, L::Input>,
+        )],
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         loop {
             let token = match self.lexer.parse_token() {
-                e@Err(_) => {
+                e @ Err(_) => {
                     self.lexer.push(e);
-                    break
-                },
-                Ok(token) => token
+                    break;
+                }
+                Ok(token) => token,
             };
 
             let mut is_done = true;
 
             if let token::Type::Symbol = token.ty {
-                let op = ops.iter_mut()
-                    .find(|(op, _)| op == &token.lexeme);
-                
+                let op = ops.iter_mut().find(|(op, _)| op == &token.lexeme);
+
                 if let Some((_, op)) = op {
                     is_done = false;
                     expr = op(self, expr, token)?;
@@ -156,10 +162,10 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
 
             if is_done {
                 self.lexer.push(Ok(token));
-                break
+                break;
             }
         }
-        
+
         Ok(expr)
     }
 
@@ -175,7 +181,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
                 expr: alloc.insert(expr),
                 op: token
             }
-            
+
             b"." => Ast::BinOp {
                 right: alloc.insert(parse!()?),
                 left: alloc.insert(expr),
@@ -197,7 +203,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
                 left: alloc.insert(expr),
                 op: token
             }
-            
+
             b"<<<" => Ast::BinOp {
                 right: alloc.insert(parse!()?),
                 left: alloc.insert(expr),
@@ -327,7 +333,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
             }
         }
     }
-    
+
     #[inline]
     fn parse_boolean_and<'alloc>(
         &mut self,
@@ -343,7 +349,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
             }
         }
     }
-    
+
     #[inline]
     fn parse_boolean_or<'alloc>(
         &mut self,
@@ -359,26 +365,28 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
             }
         }
     }
-    
+
     #[inline]
     fn parse_function<'alloc>(
         &mut self,
         alloc: Alloc<'alloc, 'input>,
     ) -> Result<'input, Ast<'alloc, 'input>, L::Input> {
         macro_rules! parse {
-            () => { self.parse_boolean_or(alloc) };
+            () => {
+                self.parse_boolean_or(alloc)
+            };
         }
         let mut expr_val = parse!()?;
 
         let mut expr = &mut expr_val;
-        
+
         loop {
             let token = match self.lexer.parse_token() {
-                e@Err(_) => {
+                e @ Err(_) => {
                     self.lexer.push(e);
-                    break
-                },
-                Ok(token) => token
+                    break;
+                }
+                Ok(token) => token,
             };
 
             let mut is_done = true;
@@ -390,11 +398,11 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
                     b"->" => {
                         let right = alloc.insert(parse!()?);
                         let left = std::mem::replace(expr, Ast::Uninit);
-                        
+
                         *expr = Ast::BinOp {
                             left: alloc.insert(left),
                             right,
-                            op: token
+                            op: token,
                         };
 
                         expr = if let Ast::BinOp { right, .. } = expr {
@@ -409,10 +417,10 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
 
             if is_done {
                 self.lexer.push(Ok(token));
-                break
+                break;
             }
         }
-        
+
         Ok(expr_val)
     }
 }

@@ -1,8 +1,8 @@
 #![deny(unsafe_code)]
 
 use lexer_ext::{
-    error::{self, Meta, Error, TokenRes},
-    token::{Block, Iter, Type, Token},
+    error::{self, Error, Meta, TokenRes},
+    token::{Block, Iter, Token, Type},
 };
 
 pub type Result<I, T> = std::result::Result<(I, T), Error<I>>;
@@ -25,7 +25,10 @@ fn match_char(c: char) -> impl FnMut(&str) -> Result<&str, &str> {
 }
 
 #[inline]
-pub fn parse_num<'input>(input: &'input str, white_space: Option<&'input str>) -> Result<&'input str, Token<'input>> {
+pub fn parse_num<'input>(
+    input: &'input str,
+    white_space: Option<&'input str>,
+) -> Result<&'input str, Token<'input>> {
     #[inline]
     pub fn parse_integer_stub(input: &str) -> Result<&str, &str> {
         let mut chars = input.chars();
@@ -146,15 +149,15 @@ pub fn parse_white_space(input: &str) -> Result<&str, &str> {
     } else {
         let (white_space, input) = input.split_at(len);
 
-        Ok((
-            input,
-            white_space
-        ))
+        Ok((input, white_space))
     }
 }
 
 #[inline]
-pub fn parse_ident<'input>(input: &'input str, white_space: Option<&'input str>) -> Result<&'input str, Token<'input>> {
+pub fn parse_ident<'input>(
+    input: &'input str,
+    white_space: Option<&'input str>,
+) -> Result<&'input str, Token<'input>> {
     #[inline]
     pub fn parse_ident_str(input: &str) -> Result<&str, &str> {
         let mut chars = input.chars();
@@ -194,7 +197,14 @@ pub fn parse_ident<'input>(input: &'input str, white_space: Option<&'input str>)
         Type::Ident
     };
 
-    Ok((input, Token { white_space, ty, lexeme: lexeme.as_bytes() }))
+    Ok((
+        input,
+        Token {
+            white_space,
+            ty,
+            lexeme: lexeme.as_bytes(),
+        },
+    ))
 }
 
 #[inline]
@@ -206,9 +216,21 @@ pub fn is_keyword(lexeme: &str) -> bool {
 }
 
 #[inline]
-pub fn parse_symbol<'input>(input: &'input str, white_space: Option<&'input str>) -> Result<&'input str, Token<'input>> {
+pub fn parse_symbol<'input>(
+    input: &'input str,
+    white_space: Option<&'input str>,
+) -> Result<&'input str, Token<'input>> {
     macro_rules! ret_op {
-        ($lexeme:expr, $input:expr) => { return Ok(($input, Token { white_space, lexeme: $lexeme, ty: lexer_ext::token::Type::Symbol })) }
+        ($lexeme:expr, $input:expr) => {
+            return Ok((
+                $input,
+                Token {
+                    white_space,
+                    lexeme: $lexeme,
+                    ty: lexer_ext::token::Type::Symbol,
+                },
+            ));
+        };
     }
 
     if input.get(0..3).is_some() {
@@ -216,41 +238,34 @@ pub fn parse_symbol<'input>(input: &'input str, white_space: Option<&'input str>
         let lexeme = lexeme.as_bytes();
 
         match lexeme {
-            | b">>>" | b"<<<"
-                => ret_op!(lexeme, input),
-            _ => ()
+            b">>>" | b"<<<" => ret_op!(lexeme, input),
+            _ => (),
         }
     }
-    
+
     if input.get(0..2).is_some() {
         let (lexeme, input) = input.split_at(2);
         let lexeme = lexeme.as_bytes();
 
         match lexeme {
-            | b".*" | b"::"
-            | b"==" | b"!="
-            | b"<=" | b">="
-            | b"&&" | b"||"
-            | b"->" | b"=>"
-                => ret_op!(lexeme, input),
-            _ => ()
+            b".*" | b"::" | b"==" | b"!=" | b"<=" | b">=" | b"&&" | b"||" | b"->" | b"=>" => {
+                ret_op!(lexeme, input)
+            }
+            _ => (),
         }
     }
-    
+
     if input.get(0..1).is_some() {
         let (lexeme, input) = input.split_at(1);
         let lexeme = lexeme.as_bytes();
 
         match lexeme {
-            | b"+" | b"-" | b"*" | b"/"
-            | b"!" | b"?" | b"." | b"$"
-            | b"&" | b"|" | b"^" | b"~"
-            | b">" | b"<"
-                => ret_op!(lexeme, input),
-            _ => ()
+            b"+" | b"-" | b"*" | b"/" | b"!" | b"?" | b"." | b"$" | b"&" | b"|" | b"^" | b"~"
+            | b">" | b"<" => ret_op!(lexeme, input),
+            _ => (),
         }
     }
-    
+
     Err(Error {
         input,
         meta: Meta::Symbol,
@@ -259,7 +274,10 @@ pub fn parse_symbol<'input>(input: &'input str, white_space: Option<&'input str>
 }
 
 #[inline]
-pub fn parse_str<'input>(input: &'input str, white_space: Option<&'input str>) -> Result<&'input str, Token<'input>> {
+pub fn parse_str<'input>(
+    input: &'input str,
+    white_space: Option<&'input str>,
+) -> Result<&'input str, Token<'input>> {
     if input.is_empty() {
         return Err(Error {
             input,
@@ -297,7 +315,10 @@ pub fn parse_str<'input>(input: &'input str, white_space: Option<&'input str>) -
 }
 
 #[inline]
-fn parse_semicolon<'input>(input: &'input str, white_space: Option<&'input str>) -> Result<&'input str, Token<'input>> {
+fn parse_semicolon<'input>(
+    input: &'input str,
+    white_space: Option<&'input str>,
+) -> Result<&'input str, Token<'input>> {
     let (input, lexeme) = match_char(';')(input)?;
 
     Ok((
@@ -349,9 +370,9 @@ impl<'input> LexerImpl<'input> {
                 Ok(Token {
                     white_space,
                     lexeme: lexeme.as_bytes(),
-                    ty: Type::BlockStart(Block::Paren)
+                    ty: Type::BlockStart(Block::Paren),
                 })
-            },
+            }
             Some("[") => {
                 let (lexeme, input) = self.input.split_at(1);
                 self.input = input;
@@ -360,9 +381,9 @@ impl<'input> LexerImpl<'input> {
                 Ok(Token {
                     white_space,
                     lexeme: lexeme.as_bytes(),
-                    ty: Type::BlockStart(Block::Square)
+                    ty: Type::BlockStart(Block::Square),
                 })
-            },
+            }
             Some("{") => {
                 let (lexeme, input) = self.input.split_at(1);
                 self.input = input;
@@ -371,72 +392,70 @@ impl<'input> LexerImpl<'input> {
                 Ok(Token {
                     white_space,
                     lexeme: lexeme.as_bytes(),
-                    ty: Type::BlockStart(Block::Curly)
+                    ty: Type::BlockStart(Block::Curly),
                 })
-            },
+            }
             Some(")") => {
                 let (lexeme, input) = self.input.split_at(1);
-                
+
                 if let Some(Block::Paren) = self.blocks.pop() {
                     self.input = input;
 
                     Ok(Token {
                         white_space,
                         lexeme: lexeme.as_bytes(),
-                        ty: Type::BlockEnd(Block::Paren)
+                        ty: Type::BlockEnd(Block::Paren),
                     })
                 } else {
                     Err(Error {
                         input: self.input,
                         meta: Meta::Block,
-                        ty: error::Type::BlockEndError(Block::Paren)
+                        ty: error::Type::BlockEndError(Block::Paren),
                     })
                 }
-            },
+            }
             Some("]") => {
                 let (lexeme, input) = self.input.split_at(1);
-                
+
                 if let Some(Block::Square) = self.blocks.pop() {
                     self.input = input;
                     Ok(Token {
                         white_space,
                         lexeme: lexeme.as_bytes(),
-                        ty: Type::BlockEnd(Block::Square)
+                        ty: Type::BlockEnd(Block::Square),
                     })
                 } else {
                     Err(Error {
                         input: self.input,
                         meta: Meta::Block,
-                        ty: error::Type::BlockEndError(Block::Square)
+                        ty: error::Type::BlockEndError(Block::Square),
                     })
                 }
-            },
+            }
             Some("}") => {
                 let (lexeme, input) = self.input.split_at(1);
-                
+
                 if let Some(Block::Curly) = self.blocks.pop() {
                     self.input = input;
-                    
+
                     Ok(Token {
                         white_space,
                         lexeme: lexeme.as_bytes(),
-                        ty: Type::BlockEnd(Block::Curly)
+                        ty: Type::BlockEnd(Block::Curly),
                     })
                 } else {
                     Err(Error {
                         input: self.input,
                         meta: Meta::Block,
-                        ty: error::Type::BlockEndError(Block::Curly)
+                        ty: error::Type::BlockEndError(Block::Curly),
                     })
                 }
-            },
-            _ => {
-                Err(Error {
-                    input,
-                    meta: Meta::Block,
-                    ty: error::Type::BlockStartError,
-                })
             }
+            _ => Err(Error {
+                input,
+                meta: Meta::Block,
+                ty: error::Type::BlockStartError,
+            }),
         }
     }
 }
@@ -452,23 +471,23 @@ impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
                     self.input = input;
                     return Ok(token);
                 }
-            }
+            };
         }
 
         let white_space = match parse_white_space(self.input) {
             Ok((input, white_space)) => {
                 self.input = input;
                 Some(white_space)
-            },
-            Err(_) => None
+            }
+            Err(_) => None,
         };
 
         if self.input.is_empty() {
             return Err(Error {
                 input: self.input,
                 meta: Meta::Token,
-                ty: error::Type::EmptyInput
-            })
+                ty: error::Type::EmptyInput,
+            });
         }
 
         forward!(parse_semicolon(self.input, white_space));
@@ -479,7 +498,7 @@ impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
         self.parse_block(white_space).map_err(|_| Error {
             input: self.input,
             meta: Meta::Token,
-            ty: error::Type::InvalidToken
+            ty: error::Type::InvalidToken,
         })
     }
 }

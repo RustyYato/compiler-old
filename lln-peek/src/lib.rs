@@ -2,8 +2,8 @@
 
 use array_deque::{ArrayDeque, Iter};
 use lexer_ext::{
+    error::TokenRes,
     token::{Lexer, Token},
-    error::TokenRes
 };
 
 // const N: usize = 10;
@@ -14,14 +14,14 @@ use std::collections::VecDeque;
 #[derive(Debug, PartialEq, Clone)]
 pub struct LLNPeek<Inner: ?Sized, T> {
     peek: VecDeque<T>,
-    inner: Inner
+    inner: Inner,
 }
 
 impl<L, T> LLNPeek<L, T> {
     pub fn new(inner: L, capacity: usize) -> Self {
         Self {
             peek: VecDeque::with_capacity(capacity),
-            inner
+            inner,
         }
     }
 }
@@ -43,7 +43,7 @@ impl<'input, L: Lexer<'input> + ?Sized> Lexer<'input> for LLNPeek<L, TokenRes<'i
         let Self { peek, inner } = self;
         match peek.pop_back() {
             Some(res) => res,
-            None => inner.parse_token()
+            None => inner.parse_token(),
         }
     }
 }
@@ -52,7 +52,7 @@ impl<'input, L: Lexer<'input> + ?Sized> LLNPeek<L, TokenRes<'input, L>> {
     #[inline]
     pub fn reserve_tokens(&mut self, n: usize) {
         let Self { peek, inner } = self;
-        
+
         if peek.len() < n {
             let n = peek.capacity().min(n);
             let len = peek.len();
@@ -69,7 +69,7 @@ impl<T, Inner: ?Sized> LLNPeek<Inner, T> {
     pub fn peek_iter(&self) -> impl Iterator<Item = &T> {
         self.peek.iter()
     }
-    
+
     #[inline]
     pub fn peek(&self) -> Option<&T> {
         self.peek.iter().next()
@@ -87,7 +87,10 @@ impl<T, Inner: ?Sized> LLNPeek<Inner, T> {
 
     #[inline]
     pub fn push(&mut self, value: T) {
-        assert!(self.peek.len() < self.peek.capacity(), "Tried to push into a full buffer");
+        assert!(
+            self.peek.len() < self.peek.capacity(),
+            "Tried to push into a full buffer"
+        );
         self.peek.push_front(value);
     }
 
@@ -108,9 +111,9 @@ impl<T, Inner: ?Sized> LLNPeek<Inner, T> {
 
 //     assert_eq!(peek.peek_iter(2).map(copy).collect::<Vec<_>>(), [0, 1]);
 //     assert_eq!(peek.peek_iter(4).map(copy).collect::<Vec<_>>(), [0, 1, 2, 3]);
-    
+
 //     peek.by_ref().take(2).for_each(drop);
-    
+
 //     assert_eq!(peek.peek_iter(2).map(copy).collect::<Vec<_>>(), [2, 3]);
 //     assert_eq!(peek.peek_iter(4).map(copy).collect::<Vec<_>>(), [2, 3, 4, 5]);
 // }

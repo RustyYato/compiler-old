@@ -1,10 +1,9 @@
-
 pub use lexer_ext::token::Block;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct BlockVec {
     inner: Vec<u8>,
-    offset: u8
+    offset: u8,
 }
 
 impl BlockVec {
@@ -12,7 +11,7 @@ impl BlockVec {
     pub fn new() -> Self {
         Self {
             inner: Vec::with_capacity(1),
-            offset: 0
+            offset: 0,
         }
     }
 
@@ -42,7 +41,7 @@ impl BlockVec {
             1 => Some(Block::Paren),
             2 => Some(Block::Square),
             3 => Some(Block::Curly),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -52,17 +51,16 @@ fn block_vec() {
     use Block::*;
     let mut vec = BlockVec::new();
     let fallback = vec![
-        Paren, Paren, Square, Square,
-        Square, Paren, Curly, Curly,
-        Curly, Paren, Square, Curly,
-        Curly, Square, Paren
+        Paren, Paren, Square, Square, Square, Paren, Curly, Curly, Curly, Paren, Square, Curly,
+        Curly, Square, Paren,
     ];
 
     for &i in &fallback {
         vec.push(i);
     }
 
-    let bytes = fallback.chunks(4)
+    let bytes = fallback
+        .chunks(4)
         .map(|x| match *x {
             [a] => a as u8,
             [a, b] => a as u8 | ((b as u8) << 2),
@@ -87,11 +85,14 @@ impl fmt::Debug for BlockVec {
             .take(self.inner.len().saturating_sub(1))
             .chain(Some(self.offset >> 1));
 
-        let iter = self.inner.iter()
+        let iter = self
+            .inner
+            .iter()
             .zip(lens)
             .flat_map(|(&slot, len)| {
                 (0..len).map(move |offset| slot.wrapping_shr((offset * 2) as u32))
-            }).map(|block| match block & 0b11 {
+            })
+            .map(|block| match block & 0b11 {
                 1 => Block::Paren,
                 2 => Block::Square,
                 3 => Block::Curly,

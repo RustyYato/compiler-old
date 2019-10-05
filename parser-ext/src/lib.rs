@@ -1,6 +1,6 @@
 pub mod ast {
     use lexer_ext::token::{self, Token};
-    
+
     pub type AstPtr<'alloc, 'input> = &'alloc mut Ast<'alloc, 'input>;
 
     #[derive(Debug, PartialEq)]
@@ -21,7 +21,7 @@ pub mod ast {
             left: AstPtr<'alloc, 'input>,
             op: Token<'input>,
             right: AstPtr<'alloc, 'input>,
-        }
+        },
     }
 
     use std::fmt;
@@ -29,15 +29,9 @@ pub mod ast {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self {
                 Self::Ident(token) => write!(f, "{}", token),
-                Self::Block {
-                    open, inner, close
-                } => write!(f, "{}{}{}", open, inner, close),
-                Self::PostOp {
-                    expr, op
-                } => write!(f, "({}{})", expr, op),
-                Self::BinOp {
-                    left, op, right
-                } => write!(f, "({}{}{})", left, op, right),
+                Self::Block { open, inner, close } => write!(f, "{}{}{}", open, inner, close),
+                Self::PostOp { expr, op } => write!(f, "({}{})", expr, op),
+                Self::BinOp { left, op, right } => write!(f, "({}{}{})", left, op, right),
                 Self::Uninit => unreachable!(),
             }
         }
@@ -50,7 +44,7 @@ pub mod ast {
         pub enum Literal<'input> {
             Int(u128),
             Float(f64),
-            Str(&'input [u8])
+            Str(&'input [u8]),
         }
 
         #[derive(Debug)]
@@ -63,13 +57,13 @@ pub mod ast {
             pub ws_3: Option<Token<'input>>,
             pub expr: AstPtr<'alloc, 'input>,
             pub ws_4: Option<Token<'input>>,
-            pub semi: Token<'input>
+            pub semi: Token<'input>,
         }
     }
 }
 
 pub mod error {
-    use lexer_ext::token::{Token, Block};
+    use lexer_ext::token::{Block, Token};
 
     pub type Result<'input, T, E> = std::result::Result<T, Error<'input, E>>;
 
@@ -85,6 +79,6 @@ pub mod error {
         NoExpression,
         EndOfBlockNotFound(Block, Token<'input>),
         ExpectedSymbol(&'static [&'static str]),
-        Lex(lexer_ext::error::Error<I>)
+        Lex(lexer_ext::error::Error<I>),
     }
 }

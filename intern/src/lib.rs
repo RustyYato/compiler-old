@@ -1,6 +1,5 @@
-
-use std::hash::{Hash, Hasher};
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 
 #[repr(transparent)]
 #[derive(Debug)]
@@ -20,19 +19,21 @@ impl<T: ?Sized> Hash for Intern<T> {
 }
 
 pub struct Interner<'a, T: ?Sized> {
-    data: HashMap<&'a T, ()>
+    data: HashMap<&'a T, ()>,
 }
 
 impl<T: ?Sized + Eq + Hash> Default for Interner<'_, T> {
     #[inline]
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<'a, T: ?Sized + Eq + Hash> Interner<'a, T> {
     #[inline]
     pub fn new() -> Self {
         Self {
-            data: HashMap::new()
+            data: HashMap::new(),
         }
     }
 
@@ -44,9 +45,7 @@ impl<'a, T: ?Sized + Eq + Hash> Interner<'a, T> {
 
         entry.or_insert(());
 
-        unsafe {
-            &*(key as *const T as *const Intern<T>)
-        }
+        unsafe { &*(key as *const T as *const Intern<T>) }
     }
 }
 

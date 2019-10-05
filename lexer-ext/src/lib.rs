@@ -45,7 +45,7 @@ pub mod token {
     pub enum Block {
         Paren = 1,
         Square = 2,
-        Curly = 3
+        Curly = 3,
     }
 
     impl<'input> Type<'input> {
@@ -99,12 +99,17 @@ pub mod token {
     pub trait Lexer<'input> {
         type Input: 'input + std::fmt::Debug + Clone;
 
-        fn parse_token(&mut self) -> std::result::Result<Token<'input>, crate::error::Error<Self::Input>>;
+        fn parse_token(
+            &mut self,
+        ) -> std::result::Result<Token<'input>, crate::error::Error<Self::Input>>;
 
-        fn iter(self) -> Iter<'input, Self> where Self: Sized {
+        fn iter(self) -> Iter<'input, Self>
+        where
+            Self: Sized,
+        {
             Iter {
                 lexer: self,
-                mark: std::marker::PhantomData
+                mark: std::marker::PhantomData,
             }
         }
     }
@@ -129,7 +134,8 @@ pub mod token {
 }
 
 pub mod error {
-    pub type Result<'input, L, T> = std::result::Result<T, Error<<L as crate::token::Lexer<'input>>::Input>>;
+    pub type Result<'input, L, T> =
+        std::result::Result<T, Error<<L as crate::token::Lexer<'input>>::Input>>;
     pub type TokenRes<'input, L> = Result<'input, L, crate::token::Token<'input>>;
 
     #[derive(Debug, Clone, PartialEq)]

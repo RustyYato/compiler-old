@@ -10,3 +10,6 @@ edition = "2018"
 lexer = { path = '../lexer' }
 parser = { path = '../parser' }
 arena = { path = '../arena' }
+
+parser-ext = { path = '../parser-ext' }
+lexer-ext = { path = '../lexer-ext' }
