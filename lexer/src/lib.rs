@@ -210,7 +210,7 @@ pub fn parse_ident<'input>(
 #[inline]
 pub fn is_keyword(lexeme: &str) -> bool {
     match lexeme {
-        "if" | "else" | "let" => true,
+        "match" | "in" | "loop" => true,
         _ => false,
     }
 }
@@ -260,7 +260,7 @@ pub fn parse_symbol<'input>(
 
         match lexeme {
             b"+" | b"-" | b"*" | b"/" | b"!" | b"?" | b"." | b"$" | b"&" | b"|" | b"^" | b"~"
-            | b">" | b"<" | b"=" => ret_op!(lexeme, input),
+            | b">" | b"<" | b"=" | b"," => ret_op!(lexeme, input),
             _ => (),
         }
     }
@@ -498,7 +498,12 @@ impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
             .or_else(move |_| parse_symbol(input, white_space))
             .or_else(move |_| parse_num(input, white_space))
             .or_else(move |_| parse_str(input, white_space))
-            .or_else(move |_| parse_block(input, blocks, white_space))?;
+            .or_else(move |_| parse_block(input, blocks, white_space))
+            .map_err(move |_| Error {
+                input,
+                meta: Meta::Token,
+                ty: error::Type::UnkownCharacter,
+            })?;
 
         self.input = input;
 
