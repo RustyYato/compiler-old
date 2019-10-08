@@ -158,7 +158,11 @@ pub mod error {
         EndOfGroupNotFound,
         EndOfBlockNotFound,
         ExpectedComma,
-        MissingArg(crate::ast::Ast<'alloc, 'input>, lexer_ext::error::Error<I>),
+        MissingArg {
+            left: crate::ast::Ast<'alloc, 'input>,
+            op: Token<'input>,
+            err: lexer_ext::error::Error<I>
+        },
         Token(Token<'input>),
         ExpectedSymbol(&'static [&'static str]),
         Lex(lexer_ext::error::Error<I>),

@@ -22,7 +22,7 @@ pub struct ParserImpl<'input, L: Lexer<'input>> {
 macro_rules! parse_right_assoc {
     (
         $(
-            $curr_parse:ident -> $next_parse:ident {
+            $curr_parse:ident -> $($next_parse:ident)|+ {
                 $($pattern:pat => $eval_ty:ident)*
             }
         )*
@@ -32,21 +32,32 @@ macro_rules! parse_right_assoc {
             &mut self,
             alloc: Alloc<'alloc, 'input>,
         ) -> AstResult<'alloc, 'input, L::Input> {
+            #![allow(clippy::let_and_return)]
+
             parse_right_assoc! {
-                (self, alloc, $next_parse)
+                (self, alloc, $($next_parse)|+)
 
                 $($pattern => $eval_ty)*
             }
         }
     )*};
     (
-        ($self:ident, $alloc:ident, $next_parse:ident)
+        ($self:ident, $alloc:ident, $($next_parse:ident)+)
         $($pattern:pat => $eval_ty:ident)*
     ) => {
-        macro_rules! parse {
-            () => { $self.$next_parse($alloc) };
+        macro_rules! parse_impl {
+            () => {{
+                let out = Err(());
+                $(let out = match out {
+                    Ok(out) => Ok(out),
+                    Err(_) => $self.$next_parse($alloc)
+                };)+
+
+                out
+            }};
         }
-        let mut expr = parse!()?;
+
+        let mut expr = parse_impl!()?;
 
         loop {
             let token = match $self.lexer.parse_token() {
@@ -56,6 +67,20 @@ macro_rules! parse_right_assoc {
                 },
                 Ok(token) => token
             };
+
+            macro_rules! parse {
+                () => {{
+                    match parse_impl!() {
+                        Ok(ast) => ast,
+                        Err(Error::Lex(err)) => return Err(Error::MissingArg {
+                            left: expr,
+                            op: token,
+                            err
+                        }),
+                        Err(e) => return Err(e)
+                    }
+                }};
+            }
 
             let mut is_done = true;
 
@@ -86,7 +111,7 @@ macro_rules! parse_right_assoc {
     };
     (@eval bin $alloc:ident, $next:ident, $expr:expr, $op:expr) => {
         Ast::BinOp {
-            right: $alloc.insert($next!()?),
+            right: $alloc.insert($next!()),
             left: $alloc.insert($expr),
             op: $op
         }
@@ -136,16 +161,6 @@ macro_rules! parse_left_assoc {
 
         let mut expr_val = parse_impl!()?;
 
-        macro_rules! parse {
-            () => {{
-                match parse_impl!() {
-                    Ok(ast) => ast,
-                    Err(Error::Lex(e)) => return Err(Error::MissingArg(expr_val, e)),
-                    Err(e) => return Err(e)
-                }
-            }};
-        }
-
         let mut expr = &mut expr_val;
 
         loop {
@@ -156,6 +171,20 @@ macro_rules! parse_left_assoc {
                 }
                 Ok(token) => token,
             };
+
+            macro_rules! parse {
+                () => {{
+                    match parse_impl!() {
+                        Ok(ast) => ast,
+                        Err(Error::Lex(err)) => return Err(Error::MissingArg {
+                            left: expr_val,
+                            op: token,
+                            err
+                        }),
+                        Err(e) => return Err(e)
+                    }
+                }};
+            }
 
             let mut is_done = true;
 
@@ -337,6 +366,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         alloc: Alloc<'alloc, 'input>,
     ) -> AstResult<'alloc, 'input, L::Input> {
         let token = self.lexer.parse_token()?;
+        
         match token.ty {
             token::Type::Ident
             | token::Type::Int(_)
@@ -429,7 +459,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         self.lexer.reserve_tokens(1);
 
         let open = self.lexer.parse_token()?;
-
+        
         let open = match open {
             open @ Token {
                 ty: token::Type::BlockStart(token::Block::Curly),
@@ -494,9 +524,9 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         &mut self,
         alloc: Alloc<'alloc, 'input>,
     ) -> AstResult<'alloc, 'input, L::Input> {
-        let mut first = Ast::Uninit;
-        let mut values = Vec::new();
         let mut commas = Vec::new();
+
+        let mut values = BufOne::new();
 
         let mut state = true;
 
@@ -506,12 +536,13 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
             if state {
                 let ast = self.parse_function(alloc);
 
-                if values.is_empty() {
-                    first = ast?;
-                } else if let Ok(ast) = ast {
-                    values.push(ast);
-                } else {
-                    break;
+                match ast {
+                    Ok(ast) => values.push(ast),
+                    Err(e) => if values.is_empty() {
+                        return Err(e)
+                    } else {
+                        break
+                    }
                 }
             } else if let Some(&Ok(
                 token @ Token {
@@ -521,11 +552,6 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
                 },
             )) = self.lexer.peek()
             {
-                if first != Ast::Uninit {
-                    values.push(first);
-                    first = Ast::Uninit;
-                }
-
                 let _ = self.lexer.parse_token();
                 commas.push(token);
             } else {
@@ -535,45 +561,25 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
             state ^= true;
         }
 
-        if commas.is_empty() {
-            Ok(first)
-        } else {
-            Ok(Ast::Items { values, commas })
-        }
+        Ok(values.make(|values| Ast::Items { values, commas }))
     }
 
     pub fn parse_call<'alloc>(
         &mut self,
         alloc: Alloc<'alloc, 'input>,
     ) -> AstResult<'alloc, 'input, L::Input> {
-        let mut first = None;
-        let mut calls = Vec::new();
+        let mut calls = BufOne::new();
 
         loop {
-            let ast = match self.parse_base(alloc) {
-                Ok(ast) => ast,
+            match self.parse_base(alloc) {
+                Ok(ast) => calls.push(ast),
                 Err(err) => {
                     break if calls.is_empty() {
                         Err(err)
-                    } else if let Some(first) = first {
-                        Ok(first)
                     } else {
-                        dbg!(calls.len());
-                        assert!(calls.len() > 1);
-                        Ok(Ast::Call(calls))
+                      Ok(calls.make(Ast::Call))
                     }
                 }
-            };
-
-            if calls.is_empty() {
-                assert!(first.is_none());
-                first = Some(ast);
-            } else {
-                if let Some(first) = first.take() {
-                    calls.push(first);
-                }
-
-                calls.push(ast);
             }
         }
     }
