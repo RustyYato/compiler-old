@@ -164,7 +164,7 @@ pub mod error {
         MissingArg {
             left: crate::ast::Ast<'alloc, 'input>,
             op: Token<'input>,
-            err: lexer_ext::error::Error<I>
+            err: lexer_ext::error::Error<I>,
         },
         Token(Token<'input>),
         ExpectedSymbol(&'static [&'static str]),

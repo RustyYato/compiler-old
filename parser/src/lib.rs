@@ -298,7 +298,7 @@ impl<'alloc, 'input, L: Lexer<'input>> Iterator for &mut ParseIterator<'_, 'allo
 
 struct BufOne<T> {
     one: Option<T>,
-    value: Vec<T>
+    value: Vec<T>,
 }
 
 impl<T> BufOne<T> {
@@ -329,9 +329,9 @@ impl<T> BufOne<T> {
     pub fn make<F: FnOnce(Vec<T>) -> T>(self, f: F) -> T {
         match self.one {
             Some(one) => one,
-            None => f(self.value)
+            None => f(self.value),
         }
-    } 
+    }
 }
 
 impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
@@ -366,7 +366,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         alloc: Alloc<'alloc, 'input>,
     ) -> AstResult<'alloc, 'input, L::Input> {
         let token = self.lexer.parse_token()?;
-        
+
         match token.ty {
             token::Type::Ident
             | token::Type::Int(_)
@@ -459,7 +459,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         self.lexer.reserve_tokens(1);
 
         let open = self.lexer.parse_token()?;
-        
+
         let open = match open {
             open @ Token {
                 ty: token::Type::BlockStart(token::Block::Curly),
@@ -538,10 +538,12 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
 
                 match ast {
                     Ok(ast) => values.push(ast),
-                    Err(e) => if values.is_empty() {
-                        return Err(e)
-                    } else {
-                        break
+                    Err(e) => {
+                        if values.is_empty() {
+                            return Err(e);
+                        } else {
+                            break;
+                        }
                     }
                 }
             } else if let Some(&Ok(
@@ -577,7 +579,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
                     break if calls.is_empty() {
                         Err(err)
                     } else {
-                      Ok(calls.make(Ast::Call))
+                        Ok(calls.make(Ast::Call))
                     }
                 }
             }
