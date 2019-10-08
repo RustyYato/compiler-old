@@ -498,7 +498,12 @@ impl<'input> lexer_ext::token::Lexer<'input> for LexerImpl<'input> {
             .or_else(move |_| parse_symbol(input, white_space))
             .or_else(move |_| parse_num(input, white_space))
             .or_else(move |_| parse_str(input, white_space))
-            .or_else(move |_| parse_block(input, blocks, white_space))?;
+            .or_else(move |_| parse_block(input, blocks, white_space))
+            .map_err(move |_| Error {
+                input,
+                meta: Meta::Token,
+                ty: error::Type::UnkownCharacter,
+            })?;
 
         self.input = input;
 

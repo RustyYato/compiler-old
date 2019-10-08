@@ -1,5 +1,5 @@
 pub mod ast {
-    use lexer_ext::token::{self, Token};
+    use lexer_ext::token::Token;
 
     pub type AstPtr<'alloc, 'input> = &'alloc mut Ast<'alloc, 'input>;
 
@@ -138,24 +138,27 @@ pub mod ast {
 }
 
 pub mod error {
-    use lexer_ext::token::{Block, Token};
+    use lexer_ext::token::Token;
 
-    pub type Result<'input, T, E> = std::result::Result<T, Error<'input, E>>;
+    pub type AstResult<'alloc, 'input, E> =
+        std::result::Result<crate::ast::Ast<'alloc, 'input>, Error<'alloc, 'input, E>>;
+    pub type Result<'alloc, 'input, T, E> = std::result::Result<T, Error<'alloc, 'input, E>>;
 
-    impl<I> From<lexer_ext::error::Error<I>> for Error<'_, I> {
+    impl<I> From<lexer_ext::error::Error<I>> for Error<'_, '_, I> {
         fn from(err: lexer_ext::error::Error<I>) -> Self {
             Self::Lex(err)
         }
     }
 
     #[derive(Debug, PartialEq)]
-    pub enum Error<'input, I> {
+    pub enum Error<'alloc, 'input, I> {
         EmptyInput,
         NoExpression,
         StartOfGroupNotFound,
         EndOfGroupNotFound,
         EndOfBlockNotFound,
         ExpectedComma,
+        MissingArg(crate::ast::Ast<'alloc, 'input>, lexer_ext::error::Error<I>),
         Token(Token<'input>),
         ExpectedSymbol(&'static [&'static str]),
         Lex(lexer_ext::error::Error<I>),

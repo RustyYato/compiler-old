@@ -161,6 +161,7 @@ pub mod error {
 
     #[derive(Debug, Clone, Copy, PartialEq)]
     pub enum Type {
+        UnkownCharacter,
         EmptyInput,
         InvalidIdentifier,
         ParseInt,
