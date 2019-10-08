@@ -206,24 +206,50 @@ macro_rules! parse_left_assoc {
 pub struct ParseIterator<'parser, 'alloc, 'input, L: Lexer<'input>> {
     parser: &'parser mut ParserImpl<'input, L>,
     alloc: Alloc<'alloc, 'input>,
+    err: Option<Error<'input, L::Input>>
 }
 
-impl<'alloc, 'input, L: Lexer<'input>> Iterator for ParseIterator<'_, 'alloc, 'input, L> {
+impl<'input, L: Lexer<'input>> ParseIterator<'_, '_, 'input, L> {
+    pub fn iter(&mut self) -> &mut Self {
+        self
+    }
+
+    pub fn has_err(&self) -> bool {
+        self.err.is_some()
+    }
+
+    pub fn err(self) -> Option<Error<'input, L::Input>> {
+        self.err
+    }
+}
+
+impl<'alloc, 'input, L: Lexer<'input>> Iterator for &mut ParseIterator<'_, 'alloc, 'input, L> {
     type Item = Ast<'alloc, 'input>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.parser.lexer.reserve_tokens(1);
+        if self.err.is_some() {
+            return None
+        }
 
-        if let Some(Ok(Token {
-            ty: token::Type::SemiColon,
-            ..
-        })) = self.parser.lexer.peek()
-        {
-            let token = self.parser.lexer.parse_token().unwrap();
-
-            Some(Ast::SemiColon(token))
-        } else {
-            self.parser.parse_expr(self.alloc).ok()
+        match self.parser.lexer.parse_token() {
+            Ok(token@Token {
+                ty: token::Type::SemiColon,
+                ..
+            }) => Some(Ast::SemiColon(token)),
+            Err(e) => {
+                self.err = Some(e.into());
+                None
+            }
+            Ok(token) => {
+                self.parser.lexer.push(Ok(token));
+                match self.parser.parse_expr(self.alloc) {
+                    Ok(ast) => Some(ast),
+                    Err(err) => {
+                        self.err = Some(err);
+                        None
+                    }
+                }
+            }
         }
     }
 }
@@ -242,6 +268,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         ParseIterator {
             parser: self,
             alloc,
+            err: None,
         }
     }
 
