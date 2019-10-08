@@ -150,6 +150,9 @@ pub mod error {
         }
     }
 
+    // FIXME: If we start storing Error types, it may be best to box `MissingArg`
+    // to reduce the size of `Error`
+    #[allow(clippy::large_enum_variant)]
     #[derive(Debug, PartialEq)]
     pub enum Error<'alloc, 'input, I> {
         EmptyInput,
