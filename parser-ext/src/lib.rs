@@ -9,12 +9,12 @@ pub mod ast {
         SemiColon(Token<'input>),
         Value(Token<'input>),
         Call(Vec<Ast<'alloc, 'input>>),
-        Block  {
+        Block {
             open: Token<'input>,
             inner: Vec<Ast<'alloc, 'input>>,
             close: Token<'input>,
         },
-        Loop  {
+        Loop {
             loop_kw: Token<'input>,
             open: Token<'input>,
             inner: Vec<Ast<'alloc, 'input>>,
@@ -47,7 +47,7 @@ pub mod ast {
         },
         Items {
             values: Vec<Ast<'alloc, 'input>>,
-            commas: Vec<Token<'input>>
+            commas: Vec<Token<'input>>,
         },
     }
 
@@ -59,16 +59,16 @@ pub mod ast {
                 Self::Value(token) => write!(f, "{}", token),
                 Self::Call(items) => {
                     write!(f, "(")?;
-                    
+
                     for (i, ast) in items.iter().enumerate() {
                         if i != 0 {
                             write!(f, " ")?;
                         }
                         write!(f, "{}", ast)?
                     }
-                    
+
                     write!(f, ")")
-                },
+                }
                 Self::Block { open, inner, close } => {
                     write!(f, "{}", open)?;
 
@@ -77,8 +77,13 @@ pub mod ast {
                     }
 
                     write!(f, "{}", close)
-                },
-                Self::Loop { loop_kw, open, inner, close } => {
+                }
+                Self::Loop {
+                    loop_kw,
+                    open,
+                    inner,
+                    close,
+                } => {
                     write!(f, "{}{}", loop_kw, open)?;
 
                     for ast in inner {
@@ -86,15 +91,25 @@ pub mod ast {
                     }
 
                     write!(f, "{}", close)
-                },
+                }
                 Self::Group { open, inner, close } => write!(f, "{}{}{}", open, inner, close),
                 Self::PostOp { expr, op } => write!(f, "({}{})", expr, op),
                 Self::PreOp { expr, op } => write!(f, "({}{})", op, expr),
                 Self::BinOp { left, op, right } => write!(f, "({}{}{})", left, op, right),
-                Self::Match { match_kw, cond, open, patterns: None, close }
-                    => write!(f, "({} {}{}{})", match_kw, cond, open, close),
-                Self::Match { match_kw, cond, open, patterns: Some(patterns), close }
-                    => write!(f, "({} {}{}{}{})", match_kw, cond, open, patterns, close),
+                Self::Match {
+                    match_kw,
+                    cond,
+                    open,
+                    patterns: None,
+                    close,
+                } => write!(f, "({} {}{}{})", match_kw, cond, open, close),
+                Self::Match {
+                    match_kw,
+                    cond,
+                    open,
+                    patterns: Some(patterns),
+                    close,
+                } => write!(f, "({} {}{}{}{})", match_kw, cond, open, patterns, close),
                 Self::Items { values, commas } => {
                     let mut values = values.iter();
                     let mut commas = commas.iter();
@@ -105,7 +120,7 @@ pub mod ast {
                         if let Some(x) = values.next() {
                             write!(f, "{}", x)?
                         }
-                        
+
                         match commas.next() {
                             Some(x) => write!(f, "{}", x)?,
                             None => break,
@@ -115,7 +130,7 @@ pub mod ast {
                     write!(f, ")")?;
 
                     Ok(())
-                },
+                }
                 Self::Uninit => unreachable!(),
             }
         }
