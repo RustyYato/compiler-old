@@ -210,7 +210,7 @@ pub fn parse_ident<'input>(
 #[inline]
 pub fn is_keyword(lexeme: &str) -> bool {
     match lexeme {
-        "if" | "else" | "let" => true,
+        "match" | "in" | "loop" => true,
         _ => false,
     }
 }
@@ -260,7 +260,7 @@ pub fn parse_symbol<'input>(
 
         match lexeme {
             b"+" | b"-" | b"*" | b"/" | b"!" | b"?" | b"." | b"$" | b"&" | b"|" | b"^" | b"~"
-            | b">" | b"<" | b"=" => ret_op!(lexeme, input),
+            | b">" | b"<" | b"=" | b"," => ret_op!(lexeme, input),
             _ => (),
         }
     }

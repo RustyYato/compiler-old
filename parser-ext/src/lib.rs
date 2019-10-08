@@ -6,6 +6,7 @@ pub mod ast {
     #[derive(Debug, PartialEq)]
     pub enum Ast<'alloc, 'input> {
         Uninit,
+        SemiColon(Token<'input>),
         Value(Token<'input>),
         Block {
             open: Token<'input>,
@@ -25,43 +26,54 @@ pub mod ast {
             op: Token<'input>,
             right: AstPtr<'alloc, 'input>,
         },
+        Match {
+            match_kw: Token<'input>,
+            cond: AstPtr<'alloc, 'input>,
+            open: Token<'input>,
+            patterns: AstPtr<'alloc, 'input>,
+            close: Token<'input>,
+        },
+        Items {
+            values: Vec<Ast<'alloc, 'input>>,
+            commas: Vec<Token<'input>>
+        }
     }
 
     use std::fmt;
     impl fmt::Display for Ast<'_, '_> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self {
+                Self::SemiColon(token) => write!(f, "{}", token),
                 Self::Value(token) => write!(f, "{}", token),
                 Self::Block { open, inner, close } => write!(f, "{}{}{}", open, inner, close),
                 Self::PostOp { expr, op } => write!(f, "({}{})", expr, op),
                 Self::PreOp { expr, op } => write!(f, "({}{})", op, expr),
                 Self::BinOp { left, op, right } => write!(f, "({}{}{})", left, op, right),
+                Self::Match { match_kw, cond, open, patterns, close }
+                    => write!(f, "({} {}{}{}{})", match_kw, cond, open, patterns, close),
+                Self::Items { values, commas } => {
+                    let mut values = values.iter();
+                    let mut commas = commas.iter();
+
+                    write!(f, "(")?;
+
+                    loop {
+                        if let Some(x) = values.next() {
+                            write!(f, "{}", x)?
+                        }
+                        
+                        match commas.next() {
+                            Some(x) => write!(f, "{}", x)?,
+                            None => break,
+                        }
+                    }
+
+                    write!(f, ")")?;
+
+                    Ok(())
+                },
                 Self::Uninit => unreachable!(),
             }
-        }
-    }
-
-    pub mod item {
-        use super::*;
-
-        #[derive(Debug, Clone)]
-        pub enum Literal<'input> {
-            Int(u128),
-            Float(f64),
-            Str(&'input [u8]),
-        }
-
-        #[derive(Debug)]
-        pub struct Let<'alloc, 'input> {
-            pub kw_let: Token<'input>,
-            pub ws_1: Option<Token<'input>>,
-            pub ident: Token<'input>,
-            pub ws_2: Option<Token<'input>>,
-            pub sym_eq: Token<'input>,
-            pub ws_3: Option<Token<'input>>,
-            pub expr: AstPtr<'alloc, 'input>,
-            pub ws_4: Option<Token<'input>>,
-            pub semi: Token<'input>,
         }
     }
 }
@@ -81,7 +93,10 @@ pub mod error {
     pub enum Error<'input, I> {
         EmptyInput,
         NoExpression,
+        StartOfGroupNotFound,
+        EndOfGroupNotFound,
         EndOfBlockNotFound,
+        ExpectedComma,
         Token(Token<'input>),
         ExpectedSymbol(&'static [&'static str]),
         Lex(lexer_ext::error::Error<I>),
