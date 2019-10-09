@@ -1,9 +1,10 @@
-
 use lln_peek::LLNPeek;
 
 #[test]
 fn peek_test() {
-    fn copy<T: Copy>(&t: &T) -> T { t }
+    fn copy<T: Copy>(&t: &T) -> T {
+        t
+    }
     let mut peek = LLNPeek::new([0, 1, 2, 3, 4, 5].iter().copied(), 4);
 
     peek.reserve_items(2);
