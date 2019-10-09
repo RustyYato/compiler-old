@@ -1,12 +1,11 @@
-
 use arena::Arena;
-use std::sync::{Arc, Barrier};
 use crossbeam::scope;
+use std::sync::{Arc, Barrier};
 
 #[test]
 pub fn seq_insert() {
     let arena = Arena::builder().build();
-    
+
     for i in 0..1000 {
         assert_eq!(*arena.insert(i), i);
     }
@@ -16,7 +15,7 @@ pub fn seq_insert() {
 pub fn par_insert() {
     let arena = Arena::builder().build();
     let arena = Arc::new(arena);
-    
+
     for _ in 0..10 {
         std::thread::spawn({
             let arena = Arc::clone(&arena);
@@ -35,7 +34,7 @@ pub fn stampede_par_insert() {
     let arena = Arena::builder().build();
     let arena = Arc::new(arena);
     let barrier = Arc::new(Barrier::new(threads));
-    
+
     for _ in 0..threads {
         std::thread::spawn({
             let arena = Arc::clone(&arena);
@@ -54,12 +53,12 @@ pub fn stampede_par_insert() {
 pub fn list_check() {
     enum Node<'a> {
         Prev(&'a mut Node<'a>, usize),
-        Item(usize)
+        Item(usize),
     }
 
     let threads = 10;
     let size = 10_000;
-    
+
     let arena = Arena::builder().slab_capacity(1000).build();
     let barrier = Barrier::new(threads);
     let arena = &arena;
@@ -88,7 +87,8 @@ pub fn list_check() {
         }
 
         nodes
-    }).unwrap();
+    })
+    .unwrap();
 
     scope(move |s| {
         for mut node in nodes {
@@ -107,11 +107,10 @@ pub fn list_check() {
 
                 match node {
                     Node::Item(0) => (),
-                    _ => panic!()
+                    _ => panic!(),
                 }
-                
-
             });
-        }    
-    }).unwrap();
+        }
+    })
+    .unwrap();
 }
