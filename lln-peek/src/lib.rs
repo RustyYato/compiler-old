@@ -48,6 +48,20 @@ impl<'input, L: Lexer<'input> + ?Sized> Lexer<'input> for LLNPeek<L, TokenRes<'i
     }
 }
 
+impl<L: Iterator + ?Sized> LLNPeek<L, L::Item> {
+    #[inline]
+    pub fn reserve_items(&mut self, n: usize) {
+        let Self { peek, inner } = self;
+
+        if peek.len() < n {
+            let n = peek.capacity().min(n);
+            let len = peek.len();
+
+            inner.take(n - len).for_each(|item| peek.push_front(item))
+        }
+    }
+}
+
 impl<'input, L: Lexer<'input> + ?Sized> LLNPeek<L, TokenRes<'input, L>> {
     #[inline]
     pub fn reserve_tokens(&mut self, n: usize) {
@@ -67,7 +81,7 @@ impl<'input, L: Lexer<'input> + ?Sized> LLNPeek<L, TokenRes<'input, L>> {
 impl<T, Inner: ?Sized> LLNPeek<Inner, T> {
     #[inline]
     pub fn peek_iter(&self) -> impl Iterator<Item = &T> {
-        self.peek.iter()
+        self.peek.iter().rev()
     }
 
     #[inline]
@@ -99,21 +113,3 @@ impl<T, Inner: ?Sized> LLNPeek<Inner, T> {
         self.peek.len()
     }
 }
-
-// pub fn peek(iter: &mut LLNPeek<dyn Iterator<Item = u32>>, f: fn(&mut u32)) {
-//     iter.peek_iter(4).for_each(f);
-// }
-
-// #[test]
-// fn peek_test() {
-//     fn copy<T: Copy>(&mut t: &mut T) -> T { t }
-//     let mut peek = [0, 1, 2, 3, 4, 5].iter().copied().lln_peek();
-
-//     assert_eq!(peek.peek_iter(2).map(copy).collect::<Vec<_>>(), [0, 1]);
-//     assert_eq!(peek.peek_iter(4).map(copy).collect::<Vec<_>>(), [0, 1, 2, 3]);
-
-//     peek.by_ref().take(2).for_each(drop);
-
-//     assert_eq!(peek.peek_iter(2).map(copy).collect::<Vec<_>>(), [2, 3]);
-//     assert_eq!(peek.peek_iter(4).map(copy).collect::<Vec<_>>(), [2, 3, 4, 5]);
-// }
