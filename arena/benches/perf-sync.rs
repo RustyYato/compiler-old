@@ -1,15 +1,13 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use arena::Arena;
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn arena(cap: usize, size: usize) -> Arena<usize> {
-    let arena = Arena::builder()
-        .slab_capacity(cap)
-        .build();
+    let arena = Arena::builder().slab_capacity(cap).build();
 
     for i in 0..size {
         assert_eq!(*arena.insert(i), i);
     }
-    
+
     arena
 }
 

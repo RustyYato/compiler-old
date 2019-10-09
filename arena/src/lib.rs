@@ -42,7 +42,7 @@ impl<T: ?Sized + Allocator> Allocator for Box<T> {
 pub struct ArenaBuilder<T> {
     slab_capacity: usize,
     slab_count: usize,
-    ty: PhantomData<T>
+    ty: PhantomData<T>,
 }
 
 impl<T> ArenaBuilder<T> {
@@ -50,15 +50,18 @@ impl<T> ArenaBuilder<T> {
         Self {
             slab_capacity: 100,
             slab_count: 4,
-            ty: PhantomData
+            ty: PhantomData,
         }
     }
 
     pub fn slab_capacity(&mut self, capacity: usize) -> &mut Self {
-        assert_ne!(capacity, 0, "An slabs of an arena must have a non-zero capacity");
+        assert_ne!(
+            capacity, 0,
+            "An slabs of an arena must have a non-zero capacity"
+        );
         self.slab_capacity = capacity;
         self
-    } 
+    }
 }
 
 impl<T> ArenaBuilder<Arena<T>> {
@@ -74,7 +77,7 @@ impl<T> ArenaBuilder<Arena<T>> {
             slab_count: self.slab_count,
             data: ShardedLock::new(ArenaData {
                 slabs: Vec::new(),
-                index: 0
+                index: 0,
             }),
         }
     }
@@ -91,13 +94,13 @@ impl<T> ArenaBuilder<LocalArena<T>> {
 
 struct ArenaData<T> {
     slabs: Vec<Slab<T>>,
-    index: usize
+    index: usize,
 }
 
 pub struct Arena<T> {
     data: ShardedLock<ArenaData<T>>,
     slab_capacity: usize,
-    slab_count: usize
+    slab_count: usize,
 }
 
 impl<T> Allocator for Arena<T> {
@@ -119,14 +122,15 @@ impl<T> Arena<T> {
         loop {
             let (no_capacity, next_value) = {
                 let data = self.data.read().unwrap();
-                
-                let result = data.slabs[data.index..].iter().try_fold((true, value), |(cap, value), slab| {
-                    match slab.try_insert(value) {
+
+                let result = data.slabs[data.index..].iter().try_fold(
+                    (true, value),
+                    |(cap, value), slab| match slab.try_insert(value) {
                         TryInsert::ReachedCapacity(value) => Continue((cap, value)),
                         TryInsert::Blocked(value) => Continue((false, value)),
                         TryInsert::Complete(value) => Break(value),
-                    }
-                });
+                    },
+                );
 
                 match result {
                     Continue((no_capacity, value)) => (no_capacity, value),
@@ -143,7 +147,8 @@ impl<T> Arena<T> {
 
                 let add_len = (data.index / 2).max(self.slab_count);
 
-                data.slabs.extend((0..add_len).map(|_| Slab::new(self.slab_capacity)));
+                data.slabs
+                    .extend((0..add_len).map(|_| Slab::new(self.slab_capacity)));
             }
         }
     }
@@ -151,7 +156,7 @@ impl<T> Arena<T> {
 
 pub struct LocalArena<T> {
     slabs: UnsafeCell<Vec<Vec<T>>>,
-    slab_capacity: usize
+    slab_capacity: usize,
 }
 
 impl<T> Allocator for LocalArena<T> {
@@ -180,10 +185,8 @@ impl<T> LocalArena<T> {
     }
 
     pub fn insert(&self, mut value: T) -> &mut T {
-        let slabs = unsafe {
-            &mut *self.slabs.get()
-        };
-        
+        let slabs = unsafe { &mut *self.slabs.get() };
+
         loop {
             if let Some(slab) = slabs.last_mut() {
                 match Self::try_insert(slab, value) {
