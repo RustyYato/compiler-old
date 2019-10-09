@@ -5,7 +5,7 @@ use crossbeam::scope;
 
 #[test]
 pub fn seq_insert() {
-    let arena = Arena::new(100);
+    let arena = Arena::builder().build();
     
     for i in 0..1000 {
         assert_eq!(*arena.insert(i), i);
@@ -14,7 +14,7 @@ pub fn seq_insert() {
 
 #[test]
 pub fn par_insert() {
-    let arena = Arena::new(100);
+    let arena = Arena::builder().build();
     let arena = Arc::new(arena);
     
     for _ in 0..10 {
@@ -32,7 +32,7 @@ pub fn par_insert() {
 #[test]
 pub fn stampede_par_insert() {
     let threads = 100;
-    let arena = Arena::new(100);
+    let arena = Arena::builder().build();
     let arena = Arc::new(arena);
     let barrier = Arc::new(Barrier::new(threads));
     
@@ -60,7 +60,7 @@ pub fn list_check() {
     let threads = 10;
     let size = 10_000;
     
-    let arena = Arena::new(1000);
+    let arena = Arena::builder().slab_capacity(1000).build();
     let barrier = Barrier::new(threads);
     let arena = &arena;
     let barrier = &barrier;
