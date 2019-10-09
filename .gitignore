@@ -1,4 +1,5 @@
 /target/
+*/target/
 *.lock
 *.asm
 *.txt

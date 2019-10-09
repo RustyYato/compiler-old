@@ -1,7 +1,7 @@
-use std::sync::RwLock;
+use std::sync::Mutex;
 
 pub struct Slab<T> {
-    data: RwLock<Vec<T>>,
+    data: Mutex<Vec<T>>,
 }
 
 pub enum TryInsert<T> {
@@ -13,12 +13,12 @@ pub enum TryInsert<T> {
 impl<T> Slab<T> {
     pub fn new(capacity: usize) -> Self {
         Self {
-            data: RwLock::new(Vec::with_capacity(capacity)),
+            data: Mutex::new(Vec::with_capacity(capacity)),
         }
     }
 
     pub fn try_insert(&self, value: T) -> TryInsert<T> {
-        let mut data = match self.data.try_write() {
+        let mut data = match self.data.try_lock() {
             Ok(data) => data,
             Err(_) => return TryInsert::Blocked(value),
         };
