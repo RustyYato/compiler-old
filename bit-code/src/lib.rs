@@ -4,7 +4,7 @@ use lexer_ext::token::Type as TType;
 use parser_ext::ast::{Ast, Parser, WithAllocator};
 use bit_code_ext::{
     builder::{Table, ContextBuilder},
-    repr::{Instruction, Type, FusedBinOp, Literal, Register},
+    repr::{Instruction, Type, BinOp, Literal, Register},
     error::{Result, Error}
 };
 
@@ -16,7 +16,8 @@ pub struct Encoder<'table, 'alloc, 'input, P, A> {
 enum Partial<'input> {
     Literal(Literal<'input>),
     Binding(&'input [u8]),
-    Complete
+    Register(Register),
+    Complete,
 }
 
 impl<'table, 'alloc, 'input: 'alloc, P, A> Encoder<'table, 'alloc, 'input, P, A>
@@ -68,7 +69,8 @@ fn encode_ast<'alloc, 'input, I>(
                     
                     match right {
                         | Partial::Literal(_)
-                        | Partial::Binding(_) => (),
+                        | Partial::Binding(_)
+                        | Partial::Register(_) => (),
                         _ => return Err(Error::ExpectedValue)
                     }
 
@@ -86,6 +88,7 @@ fn encode_ast<'alloc, 'input, I>(
 
                     let instr = match right {
                         Partial::Literal(lit) => Instruction { ast, ty: Type::AssignLiteral(left, lit) },
+                        Partial::Register(right) => Instruction { ast, ty: Type::Assign(left, right) },
                         Partial::Binding(binding) => {
                             let right = context.get(binding)?;
                             Instruction { ast, ty: Type::Assign(left, right) }
@@ -97,9 +100,51 @@ fn encode_ast<'alloc, 'input, I>(
 
                     Ok(Partial::Complete)
                 },
+                b"+" | b"-" | b"*" | b"/" => {
+                    let left = {
+                        let ast = left;
+                        let left = encode_ast(left, context)?;
+                        value(context, ast, left)?
+                    };
+                    
+                    let right = {
+                        let ast = right;
+                        let right = encode_ast(right, context)?;
+                        value(context, ast, right)?
+                    };
+
+                    let out = context.temp();
+
+                    let bin_op = BinOp { out, left, right };
+
+                    let ty = match op.lexeme {
+                        b"+" => Type::Add(bin_op),
+                        b"-" => Type::Sub(bin_op),
+                        b"*" => Type::Mul(bin_op),
+                        b"/" => Type::Div(bin_op),
+                        _ => unreachable!()
+                    };
+
+                    context.insert(Instruction { ast, ty });
+
+                    Ok(Partial::Register(out))
+                }
                 _ => unimplemented!("{:?}", ast),
             }
         },
         _ => unimplemented!("{:?}", ast),
+    }
+}
+
+fn value<'alloc, 'input, I>(context: &mut ContextBuilder<'_, 'alloc, 'input>, ast: &'alloc Ast<'alloc, 'input>, value: Partial<'input>) -> Result<'alloc, 'input, Register, I> {
+    match value {
+        Partial::Register(reg) => Ok(reg),
+        Partial::Literal(lit) => {
+            let temp = context.temp();
+            context.insert(Instruction { ast, ty: Type::AssignLiteral(temp, lit) });
+            Ok(temp)
+        },
+        Partial::Binding(binding) => context.get(binding),
+        _ => Err(Error::ExpectedValue)
     }
 }
