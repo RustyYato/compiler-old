@@ -135,6 +135,37 @@ pub mod ast {
             }
         }
     }
+
+    pub trait Parser<'alloc, 'input: 'alloc, A: ?Sized>
+    where A: arena::Allocator<Item = Ast<'alloc, 'input>>, {
+        type Input;
+
+        fn parse(
+            &mut self,
+            alloc: &'alloc A,
+        ) -> crate::error::AstResult<'alloc, 'input, Self::Input>;
+    }
+
+    pub struct WithAllocator<'alloc, P, A: ?Sized> {
+        inner: P,
+        allocator: &'alloc A
+    }
+
+    impl<'alloc, 'input: 'alloc, P, A: ?Sized> WithAllocator<'alloc, P, A>
+    where A: arena::Allocator<Item = Ast<'alloc, 'input>>,
+          P: Parser<'alloc, 'input, A> {
+        pub fn new(inner: P, allocator: &'alloc A) -> Self {
+            Self { inner, allocator }
+        }
+
+        pub fn parse(
+            &mut self,
+            alloc: &'alloc A,
+        ) -> crate::error::Result<'alloc, 'input, &'alloc mut Ast<'alloc, 'input>, P::Input> {
+            let ast = self.inner.parse(alloc)?;
+            Ok(self.allocator.alloc(ast))
+        }
+    }
 }
 
 pub mod error {

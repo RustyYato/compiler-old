@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 lexer-ext = { path = '../lexer-ext' }
+arena = { path = '../arena' }
