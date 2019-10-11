@@ -6,7 +6,7 @@ use lln_peek::LLNPeek;
 
 use parser_ext::{
     ast::Ast,
-    error::{AstResult, Error, Result},
+    error::{AstResult, Error},
 };
 
 use arena::Allocator;
