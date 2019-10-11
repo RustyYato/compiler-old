@@ -158,11 +158,8 @@ pub mod ast {
             Self { inner, allocator }
         }
 
-        pub fn parse(
-            &mut self,
-            alloc: &'alloc A,
-        ) -> crate::error::Result<'alloc, 'input, &'alloc mut Ast<'alloc, 'input>, P::Input> {
-            let ast = self.inner.parse(alloc)?;
+        pub fn parse(&mut self) -> crate::error::Result<'alloc, 'input, &'alloc mut Ast<'alloc, 'input>, P::Input> {
+            let ast = self.inner.parse(self.allocator)?;
             Ok(self.allocator.alloc(ast))
         }
     }
