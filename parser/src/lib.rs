@@ -9,9 +9,8 @@ use parser_ext::{
     error::{AstResult, Error, Result},
 };
 
-use arena::Arena;
+use arena::Allocator;
 
-type Alloc<'alloc, 'input> = &'alloc Arena<Ast<'alloc, 'input>>;
 type Iter<'input, L> = LLNPeek<L, TokenRes<'input, L>>;
 
 #[derive(Debug, Clone)]
@@ -28,9 +27,9 @@ macro_rules! parse_right_assoc {
         )*
     ) => {$(
         #[inline]
-        fn $curr_parse<'alloc>(
+        fn $curr_parse<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
             &mut self,
-            alloc: Alloc<'alloc, 'input>,
+            alloc: &'alloc A
         ) -> AstResult<'alloc, 'input, L::Input> {
             #![allow(clippy::let_and_return)]
 
@@ -105,14 +104,14 @@ macro_rules! parse_right_assoc {
     };
     (@eval post $alloc:ident, $next:ident, $expr:expr, $op:expr) => {
         Ast::PostOp {
-            expr: $alloc.insert($expr),
+            expr: $alloc.alloc($expr),
             op: $op
         }
     };
     (@eval bin $alloc:ident, $next:ident, $expr:expr, $op:expr) => {
         Ast::BinOp {
-            right: $alloc.insert($next!()),
-            left: $alloc.insert($expr),
+            right: $alloc.alloc($next!()),
+            left: $alloc.alloc($expr),
             op: $op
         }
     };
@@ -130,10 +129,10 @@ macro_rules! parse_left_assoc {
         )*
     ) => {$(
         #[inline]
-        fn $curr_parse<'alloc>(
+        fn $curr_parse<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
             &mut self,
-            alloc: Alloc<'alloc, 'input>,
-        ) -> Result<'alloc, 'input, Ast<'alloc, 'input>, L::Input> {
+            alloc: &'alloc A
+        ) -> AstResult<'alloc, 'input, L::Input> {
             #![allow(clippy::let_and_return)]
 
             parse_left_assoc! {
@@ -208,11 +207,11 @@ macro_rules! parse_left_assoc {
         Ok(expr_val)
     };
     (@eval bin $alloc:ident, $next:ident, $expr:expr, $op:expr) => {
-        let right = $alloc.insert($next!());
+        let right = $alloc.alloc($next!());
         let left = std::mem::replace($expr, Ast::Uninit);
 
         *$expr = Ast::BinOp {
-            left: $alloc.insert(left),
+            left: $alloc.alloc(left),
             right,
             op: $op,
         };
@@ -225,9 +224,9 @@ macro_rules! parse_left_assoc {
         }
     };
     (@eval custom $alloc:ident, $next:ident, $expr:expr, $op:expr, $build:expr) => {
-        let right = $alloc.insert($next!());
+        let right = $alloc.alloc($next!());
         let left = std::mem::replace($expr, Ast::Uninit);
-        let left = $alloc.insert(left);
+        let left = $alloc.alloc(left);
 
         *$expr = $build($op, left, right);
 
@@ -243,13 +242,13 @@ macro_rules! parse_left_assoc {
     };
 }
 
-pub struct ParseIterator<'parser, 'alloc, 'input, L: Lexer<'input>> {
+pub struct ParseIterator<'parser, 'alloc, 'input, L: Lexer<'input>, A: ?Sized> {
     parser: &'parser mut ParserImpl<'input, L>,
-    alloc: Alloc<'alloc, 'input>,
+    alloc: &'alloc A,
     err: Option<Error<'alloc, 'input, L::Input>>,
 }
 
-impl<'alloc, 'input, L: Lexer<'input>> ParseIterator<'_, 'alloc, 'input, L> {
+impl<'alloc, 'input, L: Lexer<'input>, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>> ParseIterator<'_, 'alloc, 'input, L, A> {
     pub fn iter(&mut self) -> &mut Self {
         self
     }
@@ -263,7 +262,7 @@ impl<'alloc, 'input, L: Lexer<'input>> ParseIterator<'_, 'alloc, 'input, L> {
     }
 }
 
-impl<'alloc, 'input, L: Lexer<'input>> Iterator for &mut ParseIterator<'_, 'alloc, 'input, L> {
+impl<'alloc, 'input, L: Lexer<'input>, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>> Iterator for &mut ParseIterator<'_, 'alloc, 'input, L, A> {
     type Item = Ast<'alloc, 'input>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -341,10 +340,10 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         }
     }
 
-    pub fn parse<'parser, 'alloc>(
+    pub fn parse<'parser, 'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &'parser mut self,
-        alloc: Alloc<'alloc, 'input>,
-    ) -> ParseIterator<'parser, 'alloc, 'input, L> {
+        alloc: &'alloc A
+    ) -> ParseIterator<'parser, 'alloc, 'input, L, A> {
         ParseIterator {
             parser: self,
             alloc,
@@ -353,17 +352,17 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     }
 
     #[inline]
-    pub fn parse_expr<'alloc>(
+    pub fn parse_expr<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &mut self,
-        alloc: Alloc<'alloc, 'input>,
+        alloc: &'alloc A
     ) -> AstResult<'alloc, 'input, L::Input> {
         self.parse_assign(alloc)
     }
 
     #[inline]
-    fn parse_base<'alloc>(
+    fn parse_base<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &mut self,
-        alloc: Alloc<'alloc, 'input>,
+        alloc: &'alloc A
     ) -> AstResult<'alloc, 'input, L::Input> {
         let token = self.lexer.parse_token()?;
 
@@ -377,7 +376,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
                 let open = token;
                 let inner = self.parse_expr(alloc)?;
                 let close = self.lexer.parse_token()?;
-                let inner = alloc.insert(inner);
+                let inner = alloc.alloc(inner);
 
                 if let Token {
                     ty: token::Type::BlockEnd(token::Block::Paren),
@@ -417,8 +416,8 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
                     _ => return Err(Error::StartOfGroupNotFound),
                 }
 
-                let cond = alloc.insert(cond);
-                let patterns = patterns.map(|patterns| alloc.insert(patterns));
+                let cond = alloc.alloc(cond);
+                let patterns = patterns.map(|patterns| alloc.alloc(patterns));
 
                 Ok(Ast::Match {
                     match_kw,
@@ -452,9 +451,9 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     }
 
     #[inline]
-    fn parse_block<'alloc>(
+    fn parse_block<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &mut self,
-        alloc: Alloc<'alloc, 'input>,
+        alloc: &'alloc A
     ) -> AstResult<'alloc, 'input, L::Input> {
         self.lexer.reserve_tokens(1);
 
@@ -479,9 +478,9 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     }
 
     #[inline]
-    fn parse_negation<'alloc>(
+    fn parse_negation<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &mut self,
-        alloc: Alloc<'alloc, 'input>,
+        alloc: &'alloc A
     ) -> AstResult<'alloc, 'input, L::Input> {
         let mut tokens = Vec::new();
 
@@ -513,16 +512,16 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         for op in tokens {
             expr = Ast::PreOp {
                 op,
-                expr: alloc.insert(expr),
+                expr: alloc.alloc(expr),
             };
         }
 
         Ok(expr)
     }
 
-    pub fn parse_comma<'alloc>(
+    pub fn parse_comma<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &mut self,
-        alloc: Alloc<'alloc, 'input>,
+        alloc: &'alloc A
     ) -> AstResult<'alloc, 'input, L::Input> {
         let mut commas = Vec::new();
 
@@ -566,9 +565,9 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         Ok(values.make(|values| Ast::Items { values, commas }))
     }
 
-    pub fn parse_call<'alloc>(
+    pub fn parse_call<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &mut self,
-        alloc: Alloc<'alloc, 'input>,
+        alloc: &'alloc A
     ) -> AstResult<'alloc, 'input, L::Input> {
         let mut calls = BufOne::new();
 
@@ -642,6 +641,27 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         parse_assign -> parse_block | parse_comma {
             b"=" => bin,
             b":=" => bin,
+        }
+    }
+}
+
+impl<'alloc, 'input: 'alloc, L: Lexer<'input>, A: ?Sized> parser_ext::ast::Parser<'alloc, 'input, A> for ParserImpl<'input, L>
+where A: arena::Allocator<Item = Ast<'alloc, 'input>>, {
+    type Input = L::Input;
+
+    fn parse(
+        &mut self,
+        alloc: &'alloc A,
+    ) -> AstResult<'alloc, 'input, Self::Input> {
+        match self.lexer.parse_token()? {
+            token @ Token {
+                ty: token::Type::SemiColon,
+                ..
+            } => Ok(Ast::SemiColon(token)),
+            token => {
+                self.lexer.push(Ok(token));
+                self.parse_expr(alloc)
+            }
         }
     }
 }
