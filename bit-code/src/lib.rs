@@ -47,92 +47,95 @@ where
 }
 
 fn encode_ast<'alloc, 'input, I>(
-    ast: &'alloc Ast<'alloc, 'input>,
+    mut ast: &'alloc Ast<'alloc, 'input>,
     context: &mut ContextBuilder<'_, 'alloc, 'input>,
 ) -> Result<'alloc, 'input, Partial<'input>, I> {
-    match ast {
-        Ast::Value(value) => {
-            let lit = match value.ty {
-                TType::Int(val) => Literal::Int(val),
-                TType::Float(val) => Literal::Float(val),
-                TType::Str(val) => Literal::Str(val),
-                TType::Ident => return Ok(Partial::Binding(value.lexeme)),
-                _ => unreachable!("Invalid Value Token: {:?}", value),
-            };
+    loop {
+        match ast {
+            Ast::Group { inner, .. } => ast = inner,
+            Ast::Value(value) => {
+                let lit = match value.ty {
+                    TType::Int(val) => Literal::Int(val),
+                    TType::Float(val) => Literal::Float(val),
+                    TType::Str(val) => Literal::Str(val),
+                    TType::Ident => return Ok(Partial::Binding(value.lexeme)),
+                    _ => unreachable!("Invalid Value Token: {:?}", value),
+                };
 
-            Ok(Partial::Literal(lit))
-        }
-        Ast::BinOp { op, left, right } => {
-            match op.lexeme {
-                b":=" | b"=" => {
-                    let right = encode_ast(right, context)?;
-                    
-                    match right {
-                        | Partial::Literal(_)
-                        | Partial::Binding(_)
-                        | Partial::Register(_) => (),
-                        _ => return Err(Error::ExpectedValue)
-                    }
-
-                    let left = encode_ast(left, context)?;
-
-                    let left = if let Partial::Binding(reg) = left {
-                        if op.lexeme == b"=" {
-                            context.get(reg)?
-                        } else {
-                            context.bind(reg)
-                        }
-                    } else {
-                        return Err(Error::ExpectedPattern)
-                    };
-
-                    let instr = match right {
-                        Partial::Literal(lit) => Instruction { ast, ty: Type::AssignLiteral(left, lit) },
-                        Partial::Register(right) => Instruction { ast, ty: Type::Assign(left, right) },
-                        Partial::Binding(binding) => {
-                            let right = context.get(binding)?;
-                            Instruction { ast, ty: Type::Assign(left, right) }
-                        },
-                        _ => unreachable!()
-                    };
-
-                    context.insert(instr);
-
-                    Ok(Partial::Complete)
-                },
-                b"+" | b"-" | b"*" | b"/" => {
-                    let left = {
-                        let ast = left;
-                        let left = encode_ast(left, context)?;
-                        value(context, ast, left)?
-                    };
-                    
-                    let right = {
-                        let ast = right;
-                        let right = encode_ast(right, context)?;
-                        value(context, ast, right)?
-                    };
-
-                    let out = context.temp();
-
-                    let bin_op = BinOp { out, left, right };
-
-                    let ty = match op.lexeme {
-                        b"+" => Type::Add(bin_op),
-                        b"-" => Type::Sub(bin_op),
-                        b"*" => Type::Mul(bin_op),
-                        b"/" => Type::Div(bin_op),
-                        _ => unreachable!()
-                    };
-
-                    context.insert(Instruction { ast, ty });
-
-                    Ok(Partial::Register(out))
-                }
-                _ => unimplemented!("{:?}", ast),
+                break Ok(Partial::Literal(lit))
             }
-        },
-        _ => unimplemented!("{:?}", ast),
+            Ast::BinOp { op, left, right } => {
+                match op.lexeme {
+                    b":=" | b"=" => {
+                        let right = encode_ast(right, context)?;
+                        
+                        match right {
+                            | Partial::Literal(_)
+                            | Partial::Binding(_)
+                            | Partial::Register(_) => (),
+                            _ => return Err(Error::ExpectedValue)
+                        }
+
+                        let left = encode_ast(left, context)?;
+
+                        let left = if let Partial::Binding(reg) = left {
+                            if op.lexeme == b"=" {
+                                context.get(reg)?
+                            } else {
+                                context.bind(reg)
+                            }
+                        } else {
+                            return Err(Error::ExpectedPattern)
+                        };
+
+                        let instr = match right {
+                            Partial::Literal(lit) => Instruction { ast, ty: Type::AssignLiteral(left, lit) },
+                            Partial::Register(right) => Instruction { ast, ty: Type::Assign(left, right) },
+                            Partial::Binding(binding) => {
+                                let right = context.get(binding)?;
+                                Instruction { ast, ty: Type::Assign(left, right) }
+                            },
+                            _ => unreachable!()
+                        };
+
+                        context.insert(instr);
+
+                        break Ok(Partial::Complete)
+                    },
+                    b"+" | b"-" | b"*" | b"/" => {
+                        let left = {
+                            let ast = left;
+                            let left = encode_ast(left, context)?;
+                            value(context, ast, left)?
+                        };
+                        
+                        let right = {
+                            let ast = right;
+                            let right = encode_ast(right, context)?;
+                            value(context, ast, right)?
+                        };
+
+                        let out = context.temp();
+
+                        let bin_op = BinOp { out, left, right };
+
+                        let ty = match op.lexeme {
+                            b"+" => Type::Add(bin_op),
+                            b"-" => Type::Sub(bin_op),
+                            b"*" => Type::Mul(bin_op),
+                            b"/" => Type::Div(bin_op),
+                            _ => unreachable!()
+                        };
+
+                        context.insert(Instruction { ast, ty });
+
+                        break Ok(Partial::Register(out))
+                    }
+                    _ => unimplemented!("{:?}", ast),
+                }
+            },
+            _ => unimplemented!("{:?}", ast),
+        }
     }
 }
 
