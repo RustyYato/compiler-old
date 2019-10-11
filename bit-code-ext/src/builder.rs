@@ -8,7 +8,7 @@ pub struct Table<'alloc, 'input> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Context<'alloc, 'input> {
     parent: usize,
-    bindings: Vec<&'input str>,
+    bindings: Vec<&'input [u8]>,
     instrs: Vec<Instruction<'alloc, 'input>>,
     children: Vec<usize>,
 }
@@ -35,7 +35,7 @@ impl<'alloc, 'input> Context<'alloc, 'input> {
         &self.instrs
     }
 
-    pub fn bindings(&self) -> &[&'input str] {
+    pub fn bindings(&self) -> &[&'input [u8]] {
         &self.bindings
     }
 
@@ -136,7 +136,16 @@ impl<'table, 'alloc, 'input> ContextBuilder<'table, 'alloc, 'input> {
         }
     }
 
-    pub fn bind(&mut self, binding: &'input str) -> Register {
+    pub fn get<I>(&mut self, binding: &'input [u8]) -> crate::error::Result<'alloc, 'input, Register, I> {
+        let index = self.context.bindings.iter().position(|&bind| bind == binding);
+
+        match index {
+            Some(index) => Ok(Register(((index as u64) << 1) | 1)),
+            None => Err(crate::error::Error::BindingNotFound(binding))
+        }
+    }
+
+    pub fn bind(&mut self, binding: &'input [u8]) -> Register {
         let index = self.context.bindings.len() as u64;
         self.context.bindings.push(binding);
         Register((index << 1) | 1)

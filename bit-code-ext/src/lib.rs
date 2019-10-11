@@ -42,14 +42,14 @@ pub mod repr {
         Sub(FusedBinOp),
         Mul(FusedBinOp),
         Div(FusedBinOp),
-        Assign(),
-        AssignLiteral(Literal<'input>),
+        Assign(Register, Register),
+        AssignLiteral(Register, Literal<'input>),
     }
 
     #[derive(Debug, PartialEq, Clone, Copy)]
     pub enum Literal<'input> {
-        Str(&'input str),
-        Int(i128),
+        Str(&'input [u8]),
+        Int(u128),
         Float(f64),
     }
 }
@@ -68,6 +68,9 @@ pub mod error {
     #[allow(clippy::large_enum_variant)]
     #[derive(Debug, PartialEq)]
     pub enum Error<'alloc, 'input, I> {
+        ExpectedValue,
+        ExpectedPattern,
+        BindingNotFound(&'input [u8]),
         Lex(parser_ext::error::Error<'alloc, 'input, I>),
     }
 }

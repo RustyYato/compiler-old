@@ -14,7 +14,9 @@ fn main() {
     let parser = WithAllocator::new(parser, &alloc);
     let encoder = Encoder::new(&mut table, parser);
 
-    encoder.encode();
+    encoder.encode().unwrap();
+
+    println!("{:#?}", table);
 
     // let mut parse_iter = parser.parse(&alloc);
 
