@@ -248,7 +248,9 @@ pub struct ParseIterator<'parser, 'alloc, 'input, L: Lexer<'input>, A: ?Sized> {
     err: Option<Error<'alloc, 'input, L::Input>>,
 }
 
-impl<'alloc, 'input, L: Lexer<'input>, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>> ParseIterator<'_, 'alloc, 'input, L, A> {
+impl<'alloc, 'input, L: Lexer<'input>, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>
+    ParseIterator<'_, 'alloc, 'input, L, A>
+{
     pub fn iter(&mut self) -> &mut Self {
         self
     }
@@ -262,7 +264,9 @@ impl<'alloc, 'input, L: Lexer<'input>, A: ?Sized + Allocator<Item = Ast<'alloc, 
     }
 }
 
-impl<'alloc, 'input, L: Lexer<'input>, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>> Iterator for &mut ParseIterator<'_, 'alloc, 'input, L, A> {
+impl<'alloc, 'input, L: Lexer<'input>, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>> Iterator
+    for &mut ParseIterator<'_, 'alloc, 'input, L, A>
+{
     type Item = Ast<'alloc, 'input>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -342,7 +346,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
 
     pub fn parse<'parser, 'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &'parser mut self,
-        alloc: &'alloc A
+        alloc: &'alloc A,
     ) -> ParseIterator<'parser, 'alloc, 'input, L, A> {
         ParseIterator {
             parser: self,
@@ -354,7 +358,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     #[inline]
     pub fn parse_expr<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &mut self,
-        alloc: &'alloc A
+        alloc: &'alloc A,
     ) -> AstResult<'alloc, 'input, L::Input> {
         self.parse_assign(alloc)
     }
@@ -362,7 +366,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     #[inline]
     fn parse_base<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &mut self,
-        alloc: &'alloc A
+        alloc: &'alloc A,
     ) -> AstResult<'alloc, 'input, L::Input> {
         let token = self.lexer.parse_token()?;
 
@@ -453,7 +457,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     #[inline]
     fn parse_block<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &mut self,
-        alloc: &'alloc A
+        alloc: &'alloc A,
     ) -> AstResult<'alloc, 'input, L::Input> {
         self.lexer.reserve_tokens(1);
 
@@ -480,7 +484,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     #[inline]
     fn parse_negation<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &mut self,
-        alloc: &'alloc A
+        alloc: &'alloc A,
     ) -> AstResult<'alloc, 'input, L::Input> {
         let mut tokens = Vec::new();
 
@@ -521,7 +525,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
 
     pub fn parse_comma<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &mut self,
-        alloc: &'alloc A
+        alloc: &'alloc A,
     ) -> AstResult<'alloc, 'input, L::Input> {
         let mut commas = Vec::new();
 
@@ -567,7 +571,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
 
     pub fn parse_call<'alloc, A: ?Sized + Allocator<Item = Ast<'alloc, 'input>>>(
         &mut self,
-        alloc: &'alloc A
+        alloc: &'alloc A,
     ) -> AstResult<'alloc, 'input, L::Input> {
         let mut calls = BufOne::new();
 
@@ -645,14 +649,14 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     }
 }
 
-impl<'alloc, 'input: 'alloc, L: Lexer<'input>, A: ?Sized> parser_ext::ast::Parser<'alloc, 'input, A> for ParserImpl<'input, L>
-where A: arena::Allocator<Item = Ast<'alloc, 'input>>, {
+impl<'alloc, 'input: 'alloc, L: Lexer<'input>, A: ?Sized> parser_ext::ast::Parser<'alloc, 'input, A>
+    for ParserImpl<'input, L>
+where
+    A: arena::Allocator<Item = Ast<'alloc, 'input>>,
+{
     type Input = L::Input;
 
-    fn parse(
-        &mut self,
-        alloc: &'alloc A,
-    ) -> AstResult<'alloc, 'input, Self::Input> {
+    fn parse(&mut self, alloc: &'alloc A) -> AstResult<'alloc, 'input, Self::Input> {
         match self.lexer.parse_token()? {
             token @ Token {
                 ty: token::Type::SemiColon,

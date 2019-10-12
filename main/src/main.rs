@@ -1,7 +1,7 @@
 fn main() {
-    use parser_ext::ast::WithAllocator;
-    use bit_code_ext::builder::Table;
+    use bit_code::builder::Table;
     use bit_code::Encoder;
+    use parser_ext::ast::WithAllocator;
 
     let alloc = arena::LocalArena::builder().build();
     let mut table = Table::default();

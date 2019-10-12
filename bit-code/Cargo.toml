@@ -9,5 +9,4 @@ edition = "2018"
 [dependencies]
 lexer-ext = { path = '../lexer-ext' }
 parser-ext = { path = '../parser-ext' }
-bit-code-ext = { path = '../bit-code-ext' }
 arena = { path = '../arena' }

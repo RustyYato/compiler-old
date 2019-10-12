@@ -14,4 +14,3 @@ bit-code = { path = '../bit-code' }
 
 lexer-ext = { path = '../lexer-ext' }
 parser-ext = { path = '../parser-ext' }
-bit-code-ext = { path = '../bit-code-ext' }

@@ -15,5 +15,4 @@ members = [
     'parser-ext',
 
     'bit-code',
-    'bit-code-ext',
 ]

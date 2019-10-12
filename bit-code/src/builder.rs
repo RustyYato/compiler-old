@@ -110,7 +110,7 @@ impl<'alloc, 'input> Table<'alloc, 'input> {
             index,
             context,
             temp_count: 0,
-            table: self
+            table: self,
         }
     }
 }
@@ -136,12 +136,19 @@ impl<'table, 'alloc, 'input> ContextBuilder<'table, 'alloc, 'input> {
         }
     }
 
-    pub fn get<I>(&mut self, binding: &'input [u8]) -> crate::error::Result<'alloc, 'input, Register, I> {
-        let index = self.context.bindings.iter().position(|&bind| bind == binding);
+    pub fn get<I>(
+        &mut self,
+        binding: &'input [u8],
+    ) -> crate::error::Result<'alloc, 'input, Register, I> {
+        let index = self
+            .context
+            .bindings
+            .iter()
+            .position(|&bind| bind == binding);
 
         match index {
             Some(index) => Ok(Register(((index as u64) << 1) | 1)),
-            None => Err(crate::error::Error::BindingNotFound(binding))
+            None => Err(crate::error::Error::BindingNotFound(binding)),
         }
     }
 
