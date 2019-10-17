@@ -1,5 +1,5 @@
 [package]
-name = "main"
+name = "bit-code"
 version = "0.1.0"
 authors = ["Ozaren <krishna.sd.2012@gmail.com>"]
 edition = "2018"
@@ -7,10 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lexer = { path = '../lexer' }
-parser = { path = '../parser' }
-arena = { path = '../arena' }
-bit-code = { path = '../bit-code' }
-
 lexer-ext = { path = '../lexer-ext' }
 parser-ext = { path = '../parser-ext' }
+arena = { path = '../arena' }

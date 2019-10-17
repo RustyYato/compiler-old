@@ -1,29 +1,26 @@
 fn main() {
-    use lexer_ext::token::Lexer;
+    use bit_code::builder::Table;
+    use bit_code::Encoder;
+    use parser_ext::ast::WithAllocator;
 
-    let alloc = arena::Arena::builder().build();
+    let alloc = arena::LocalArena::builder().build();
+    let mut table = Table::default();
 
     let file = std::env::args().nth(1).expect("Please provide a file name");
     let file = std::fs::read_to_string(file).expect("Could not read file");
 
-    // for token in lexer::LexerImpl::new(&file).iter() {
-    //     println!("{:?}", token);
-    // }
-
     let mut lexer = lexer::LexerImpl::new(&file);
-    let mut parser = parser::ParserImpl::<&mut dyn Lexer<Input = _>>::new(&mut lexer);
+    let parser = parser::ParserImpl::new(&mut lexer);
+    let parser = WithAllocator::new(parser, &alloc);
+    let encoder = Encoder::new(&mut table, parser);
 
-    let mut parse_iter = parser.parse(&alloc);
+    encoder.encode().unwrap();
 
-    for ast in parse_iter.iter() {
-        println!("{}", ast);
-    }
+    println!("{:#?}", table);
 
-    println!("ERR = {:?}", parse_iter.err().unwrap());
-
-    // println!("------------------------------------------");
-
-    // for ast in ast {
-    //     println!("{:?}", ast);
+    // while let Ok(ast) = parser.parse() {
+    //     println!("{}", ast);
     // }
+
+    // println!("ERR = {:?}", parse_iter.err().unwrap());
 }

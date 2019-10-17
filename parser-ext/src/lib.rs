@@ -6,6 +6,10 @@ pub mod ast {
     #[derive(Debug, PartialEq)]
     pub enum Ast<'alloc, 'input> {
         Uninit,
+        Unit {
+            open: Token<'input>,
+            close: Token<'input>,
+        },
         SemiColon(Token<'input>),
         Value(Token<'input>),
         Call(Vec<Ast<'alloc, 'input>>),
@@ -55,6 +59,7 @@ pub mod ast {
     impl fmt::Display for Ast<'_, '_> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self {
+                Self::Unit { .. } => write!(f, "()"),
                 Self::SemiColon(token) => write!(f, "{}", token),
                 Self::Value(token) => write!(f, "{}", token),
                 Self::Call(items) => {
@@ -133,6 +138,41 @@ pub mod ast {
                 }
                 Self::Uninit => unreachable!(),
             }
+        }
+    }
+
+    pub trait Parser<'alloc, 'input: 'alloc, A: ?Sized>
+    where
+        A: arena::Allocator<Item = Ast<'alloc, 'input>>,
+    {
+        type Input;
+
+        fn parse(
+            &mut self,
+            alloc: &'alloc A,
+        ) -> crate::error::AstResult<'alloc, 'input, Self::Input>;
+    }
+
+    pub struct WithAllocator<'alloc, P, A: ?Sized> {
+        inner: P,
+        allocator: &'alloc A,
+    }
+
+    impl<'alloc, 'input: 'alloc, P, A: ?Sized> WithAllocator<'alloc, P, A>
+    where
+        A: arena::Allocator<Item = Ast<'alloc, 'input>>,
+        P: Parser<'alloc, 'input, A>,
+    {
+        pub fn new(inner: P, allocator: &'alloc A) -> Self {
+            Self { inner, allocator }
+        }
+
+        pub fn parse(
+            &mut self,
+        ) -> crate::error::Result<'alloc, 'input, &'alloc mut Ast<'alloc, 'input>, P::Input>
+        {
+            let ast = self.inner.parse(self.allocator)?;
+            Ok(self.allocator.alloc(ast))
         }
     }
 }
