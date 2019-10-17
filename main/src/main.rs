@@ -18,9 +18,7 @@ fn main() {
 
     println!("{:#?}", table);
 
-    // let mut parse_iter = parser.parse(&alloc);
-
-    // for ast in parse_iter.iter() {
+    // while let Ok(ast) = parser.parse() {
     //     println!("{}", ast);
     // }
 

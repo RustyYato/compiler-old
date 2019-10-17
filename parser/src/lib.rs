@@ -377,6 +377,17 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
 
             token::Type::BlockStart(token::Block::Paren) => {
                 let open = token;
+
+                match self.lexer.parse_token() {
+                    Ok(
+                        close @ Token {
+                            ty: token::Type::BlockEnd(token::Block::Paren),
+                            ..
+                        },
+                    ) => return Ok(Ast::Unit { open, close }),
+                    res => self.lexer.push(res),
+                }
+
                 let inner = self.parse_expr(alloc)?;
                 let close = self.lexer.parse_token()?;
                 let inner = alloc.alloc(inner);

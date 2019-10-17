@@ -58,6 +58,7 @@ fn encode_ast<'alloc, 'input, I>(
 ) -> Result<'alloc, 'input, Partial<'input>, I> {
     loop {
         match ast {
+            Ast::Unit { .. } => break Ok(Partial::Literal(Literal::Unit)),
             Ast::Group { inner, .. } => ast = inner,
             Ast::Value(value) => {
                 let lit = match value.ty {
@@ -142,6 +143,26 @@ fn encode_ast<'alloc, 'input, I>(
                     context.insert(Instruction { ast, ty });
 
                     break Ok(Partial::Register(out));
+                }
+                b":" => {
+                    let left = {
+                        let ast = left;
+                        let left = encode_ast(left, context)?;
+                        value(context, ast, left)?
+                    };
+
+                    let right = {
+                        let ast = right;
+                        let right = encode_ast(right, context)?;
+                        value(context, ast, right)?
+                    };
+
+                    context.insert(Instruction {
+                        ast,
+                        ty: Type::Type(left, right),
+                    });
+
+                    break Ok(Partial::Complete);
                 }
                 _ => unimplemented!("{:?}", ast),
             },

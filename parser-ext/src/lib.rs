@@ -6,6 +6,10 @@ pub mod ast {
     #[derive(Debug, PartialEq)]
     pub enum Ast<'alloc, 'input> {
         Uninit,
+        Unit {
+            open: Token<'input>,
+            close: Token<'input>,
+        },
         SemiColon(Token<'input>),
         Value(Token<'input>),
         Call(Vec<Ast<'alloc, 'input>>),
@@ -55,6 +59,7 @@ pub mod ast {
     impl fmt::Display for Ast<'_, '_> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self {
+                Self::Unit { .. } => write!(f, "()"),
                 Self::SemiColon(token) => write!(f, "{}", token),
                 Self::Value(token) => write!(f, "{}", token),
                 Self::Call(items) => {

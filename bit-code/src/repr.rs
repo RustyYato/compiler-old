@@ -56,6 +56,7 @@ pub enum Type<'input> {
     Sub(BinOp),
     Mul(BinOp),
     Div(BinOp),
+    Type(Register, Register),
     Assign(Register, Register),
     AssignLiteral(Register, Literal<'input>),
 }
@@ -65,4 +66,5 @@ pub enum Literal<'input> {
     Str(&'input [u8]),
     Int(u128),
     Float(f64),
+    Unit,
 }
