@@ -313,8 +313,7 @@ impl<T> BufOne<T> {
     }
 
     fn push(&mut self, value: T) {
-        if self.value.is_empty() {
-            assert!(self.one.is_none());
+        if self.one.is_none() && self.value.is_empty() {
             self.one = Some(value);
         } else {
             if let Some(one) = self.one.take() {
@@ -360,7 +359,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
         &mut self,
         alloc: &'alloc A,
     ) -> AstResult<'alloc, 'input, L::Input> {
-        self.parse_assign(alloc)
+        self.parse_comma(alloc)
     }
 
     #[inline]
@@ -537,7 +536,7 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
             self.lexer.reserve_tokens(1);
 
             if state {
-                let ast = self.parse_function(alloc);
+                let ast = self.parse_assign(alloc);
 
                 match ast {
                     Ok(ast) => values.push(ast),
@@ -638,11 +637,15 @@ impl<'input, L: Lexer<'input>> ParserImpl<'input, L> {
     }
 
     parse_left_assoc! {
+        parse_colon -> parse_function {
+            b":" => bin
+        }
+
         parse_function -> parse_block | parse_boolean_or {
             b"->" => bin
         }
 
-        parse_assign -> parse_block | parse_comma {
+        parse_assign -> parse_block | parse_colon {
             b"=" => bin,
             b":=" => bin,
         }

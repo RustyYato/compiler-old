@@ -260,7 +260,7 @@ pub fn parse_symbol<'input>(
 
         match lexeme {
             b"+" | b"-" | b"*" | b"/" | b"!" | b"?" | b"." | b"$" | b"&" | b"|" | b"^" | b"~"
-            | b">" | b"<" | b"=" | b"," => ret_op!(lexeme, input),
+            | b">" | b"<" | b"=" | b"," | b":" => ret_op!(lexeme, input),
             _ => (),
         }
     }
